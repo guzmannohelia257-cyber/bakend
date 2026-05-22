@@ -209,15 +209,75 @@ async def reportar_incidencia(
 
     estado_borrador = _ensure_estado_borrador(db)
 
-    # Limpia borradores previos del mismo usuario (si abandonó un flujo anterior)
-    borradores_previos = db.query(Incidente).filter(
-        Incidente.id_usuario == current_user.id_usuario,
-        Incidente.id_estado == estado_borrador.id_estado,
-    ).all()
-    for prev in borradores_previos:
-        db.delete(prev)
-    if borradores_previos:
-        db.flush()
+    # Limpia borradores previos del mismo usuario (si abandonó un flujo anterior).
+    # Hay que borrar los hijos primero porque las FKs no tienen cascade.
+    borradores_previos_ids = [
+        row[0]
+        for row in db.query(Incidente.id_incidente).filter(
+            Incidente.id_usuario == current_user.id_usuario,
+            Incidente.id_estado == estado_borrador.id_estado,
+        ).all()
+    ]
+    if borradores_previos_ids:
+        # Borramos hijos en orden seguro antes del padre (FK sin cascade).
+        # historial_* primero porque referencian asignacion, luego asignacion,
+        # luego candidato/evidencia/metrica/etc., y al final el incidente.
+        from app.models.incidente import (
+            Asignacion as _Asignacion,
+            CandidatoAsignacion as _CandidatoAsignacion,
+            Evidencia as _Evidencia,
+            HistorialEstadoAsignacion as _HEA,
+            HistorialEstadoIncidente as _HEI,
+        )
+        from app.models.transaccional import (
+            Mensaje as _Mensaje,
+            Metrica as _Metrica,
+            Notificacion as _Notificacion,
+            Pago as _Pago,
+        )
+
+        # Historial de asignaciones referencia asignaciones → primero
+        asignacion_ids = [
+            row[0]
+            for row in db.query(_Asignacion.id_asignacion).filter(
+                _Asignacion.id_incidente.in_(borradores_previos_ids)
+            ).all()
+        ]
+        if asignacion_ids:
+            db.query(_HEA).filter(
+                _HEA.id_asignacion.in_(asignacion_ids)
+            ).delete(synchronize_session=False)
+
+        db.query(_HEI).filter(
+            _HEI.id_incidente.in_(borradores_previos_ids)
+        ).delete(synchronize_session=False)
+        db.query(_CandidatoAsignacion).filter(
+            _CandidatoAsignacion.id_incidente.in_(borradores_previos_ids)
+        ).delete(synchronize_session=False)
+        db.query(_Asignacion).filter(
+            _Asignacion.id_incidente.in_(borradores_previos_ids)
+        ).delete(synchronize_session=False)
+        db.query(_Evidencia).filter(
+            _Evidencia.id_incidente.in_(borradores_previos_ids)
+        ).delete(synchronize_session=False)
+        db.query(_Metrica).filter(
+            _Metrica.id_incidente.in_(borradores_previos_ids)
+        ).delete(synchronize_session=False)
+        db.query(_Notificacion).filter(
+            _Notificacion.id_incidente.in_(borradores_previos_ids)
+        ).delete(synchronize_session=False)
+        db.query(_Mensaje).filter(
+            _Mensaje.id_incidente.in_(borradores_previos_ids)
+        ).delete(synchronize_session=False)
+        db.query(_Pago).filter(
+            _Pago.id_incidente.in_(borradores_previos_ids)
+        ).delete(synchronize_session=False)
+
+        # Finalmente, el incidente padre.
+        db.query(Incidente).filter(
+            Incidente.id_incidente.in_(borradores_previos_ids)
+        ).delete(synchronize_session=False)
+        db.commit()
 
     # Crear incidente como borrador (no se notifica a talleres)
     nuevo_incidente = Incidente(
