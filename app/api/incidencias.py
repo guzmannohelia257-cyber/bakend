@@ -364,21 +364,46 @@ async def confirmar_incidencia(
     db.commit()
     db.refresh(incidente)
 
-    # Ahora sí: motor de asignación + broadcast a talleres
+    # Motor de asignación: lista talleres compatibles + crea candidatos
     talleres_dist = matching_service.buscar_talleres_compatibles(db, incidente)
     talleres = [t for t, _d in talleres_dist]
+    id_taller_destino: Optional[int] = None
     if talleres:
         matching_service.crear_candidatos(db, incidente, talleres_dist)
 
-        # Si el cliente eligió un taller preferido, marcar ese candidato como seleccionado
+        # Determinar el taller "destinatario" de la asignacion en pendiente:
+        # 1. Si el cliente eligió taller -> ese
+        # 2. Si no, el primer candidato (más cercano)
         if payload and payload.id_taller_preferido:
-            cand = db.query(CandidatoAsignacion).filter(
-                CandidatoAsignacion.id_incidente == incidente.id_incidente,
-                CandidatoAsignacion.id_taller == payload.id_taller_preferido,
-            ).first()
-            if cand:
-                cand.seleccionado = True
-                db.commit()
+            if any(t.id_taller == payload.id_taller_preferido for t in talleres):
+                id_taller_destino = payload.id_taller_preferido
+        if id_taller_destino is None:
+            id_taller_destino = talleres[0].id_taller
+
+        # Marcar el candidato como seleccionado para trazabilidad
+        cand = db.query(CandidatoAsignacion).filter(
+            CandidatoAsignacion.id_incidente == incidente.id_incidente,
+            CandidatoAsignacion.id_taller == id_taller_destino,
+        ).first()
+        if cand:
+            cand.seleccionado = True
+
+        # Crear la asignacion en estado pendiente para que aparezca en el
+        # dashboard del taller. Si ese taller rechaza, el endpoint de rechazo
+        # se encarga de pasar al siguiente candidato.
+        estado_asig_pendiente = db.query(EstadoAsignacion).filter_by(nombre="pendiente").first()
+        if estado_asig_pendiente:
+            taller_destino = next(t for t in talleres if t.id_taller == id_taller_destino)
+            db.add(Asignacion(
+                id_tenant=taller_destino.id_tenant,
+                id_incidente=incidente.id_incidente,
+                id_taller=id_taller_destino,
+                id_estado_asignacion=estado_asig_pendiente.id_estado_asignacion,
+            ))
+            # El incidente hereda el tenant del taller para que aparezca en sus queries
+            incidente.id_tenant = taller_destino.id_tenant
+        db.commit()
+        db.refresh(incidente)
 
         await broadcast_emergencia(incidente, talleres)
 
