@@ -39,7 +39,7 @@ def crear_usuarios_seed():
         usuarios_seed = [
             {
                 "nombre": "Juan Conductor",
-                "email": "conductor@ejemplo.com",
+                "email": "juanconductor.cliente@gmail.com",
                 "password": "miPassword123!",
                 "telefono": "+57 3001234567",
                 "id_rol": 1,  # Cliente
@@ -47,7 +47,7 @@ def crear_usuarios_seed():
             },
             {
                 "nombre": "Juan Pérez - Técnico",
-                "email": "tecnico.juan@taller.com",
+                "email": "juanperez.tecnico@gmail.com",
                 "password": "password456!",
                 "telefono": "+57 3105551111",
                 "id_rol": 3,  # Técnico
@@ -55,7 +55,7 @@ def crear_usuarios_seed():
             },
             {
                 "nombre": "Carlos - Gerente Taller",
-                "email": "gerente@tallerexcelente.com",
+                "email": "tallerexcelente.demo@gmail.com",
                 "password": "gerente789!",
                 "telefono": "+57 3105552222",
                 "id_rol": 2,  # Taller
@@ -63,7 +63,7 @@ def crear_usuarios_seed():
             },
             {
                 "nombre": "Administrador Sistema",
-                "email": "admin@plataforma.com",
+                "email": "admin.flujoemergencia@gmail.com",
                 "password": "admin2026!",
                 "telefono": "+57 3105553333",
                 "id_rol": 4,  # Admin
@@ -142,11 +142,11 @@ if __name__ == "__main__":
         print("🎉 ¡Usuarios listos para pruebas!")
         print("=" * 60)
         print("\n📱 FLUTTER - Prueba con:")
-        print("   1. Cliente: conductor@ejemplo.com / miPassword123!")
-        print("   2. Técnico: tecnico.juan@taller.com / password456!")
+        print("   1. Cliente: juanconductor.cliente@gmail.com / miPassword123!")
+        print("   2. Técnico: juanperez.tecnico@gmail.com / password456!")
         print("\n🌐 ANGULAR - Prueba con:")
-        print("   1. Taller: gerente@tallerexcelente.com / gerente789!")
-        print("   2. Admin: admin@plataforma.com / admin2026!")
+        print("   1. Taller: tallerexcelente.demo@gmail.com / gerente789!")
+        print("   2. Admin: admin.flujoemergencia@gmail.com / admin2026!")
         print("\n🔗 URL de login: POST http://localhost:8000/usuarios/login")
         print("📖 Documentación: http://localhost:8000/docs\n")
     else:

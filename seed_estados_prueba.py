@@ -3,8 +3,8 @@
 Seed de incidentes en los 5 estados de asignacion.
 
 Relaciona a:
-  CLIENTE  →  conductor@ejemplo.com   (password: cliente123!)
-  TALLER   →  gerente@tallerexcelente.com (password: taller123!)
+  CLIENTE  →  juanconductor.cliente@gmail.com   (password: cliente123!)
+  TALLER   →  tallerexcelente.demo@gmail.com (password: taller123!)
 
 Crea 5 incidentes — uno por cada estado posible — para que el taller
 vea datos reales en cada pestaña de su app y el cliente vea flujos
@@ -38,8 +38,8 @@ SessionLocal = sessionmaker(bind=engine)
 LAT_REF = -17.8454274
 LNG_REF = -63.1561987
 
-EMAIL_CLIENTE = "conductor@ejemplo.com"
-EMAIL_TALLER = "gerente@tallerexcelente.com"
+EMAIL_CLIENTE = "juanconductor.cliente@gmail.com"
+EMAIL_TALLER = "tallerexcelente.demo@gmail.com"
 
 # Escenarios: 1 incidente por estado de asignacion.
 # Offset en grados desde el punto de referencia (~1km por 0.009 grados).

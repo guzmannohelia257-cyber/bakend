@@ -12,7 +12,7 @@ print("1️⃣  AUTENTICACIÓN")
 print("=" * 60)
 
 login_data = {
-    "email": "conductor@ejemplo.com",
+    "email": "juanconductor.cliente@gmail.com",
     "password": "cliente123!"
 }
 

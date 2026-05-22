@@ -31,10 +31,10 @@ import requests
 
 BASE_URL = os.getenv("SEED_BASE_URL", "https://back-despliegue-cp05.onrender.com").rstrip("/")
 
-ADMIN_EMAIL = os.getenv("SEED_ADMIN_EMAIL", "admin@plataforma.com")
+ADMIN_EMAIL = os.getenv("SEED_ADMIN_EMAIL", "admin.flujoemergencia@gmail.com")
 ADMIN_PASSWORD = os.getenv("SEED_ADMIN_PASSWORD", "admin123!")
 
-TALLER_EMAIL = os.getenv("SEED_TALLER_EMAIL", "gerente@tallerexcelente.com")
+TALLER_EMAIL = os.getenv("SEED_TALLER_EMAIL", "tallerexcelente.demo@gmail.com")
 TALLER_PASSWORD = os.getenv("SEED_TALLER_PASSWORD", "taller123!")
 
 # Coordenadas Santa Cruz de la Sierra (aprox.)

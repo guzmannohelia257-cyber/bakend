@@ -17,7 +17,7 @@ logger = logging.getLogger("trazabilidad")
 _NOTIF_ASIGNACION = {
     "aceptada":   ("Solicitud aceptada", "Tu solicitud fue aceptada por el taller. Un técnico está siendo asignado."),
     "en_camino":  ("Técnico en camino", "El técnico ya salió hacia tu ubicación."),
-    "completada": ("Servicio completado", "El técnico ha completado el servicio. ¡Gracias por usar Yary!"),
+    "completada": ("Servicio completado", "El técnico ha completado el servicio. ¡Gracias por confiar en nosotros!"),
     "rechazada":  ("Solicitud rechazada", "Tu solicitud fue rechazada por el taller."),
 }
 

@@ -137,12 +137,30 @@ def obtener_estados(
 # OPERACIONES (Crear, Listar, Obtener)
 # ==========================================
 
+def _ensure_estado_borrador(db: Session) -> EstadoIncidente:
+    """Asegura que el estado 'borrador' exista; lo crea on-the-fly si falta."""
+    estado = db.query(EstadoIncidente).filter_by(nombre="borrador").first()
+    if not estado:
+        estado = EstadoIncidente(
+            nombre="borrador",
+            descripcion="Borrador: el cliente aún no confirmó el taller",
+        )
+        db.add(estado)
+        db.commit()
+        db.refresh(estado)
+    return estado
+
+
 @router.post(
     "/",
     response_model=IncidenteResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Reportar una emergencia vehicular",
-    description="Crea un nuevo incidente. Valida que el vehículo pertenezca al usuario."
+    summary="Crear un borrador de incidente (no se publica al taller hasta confirmar)",
+    description=(
+        "Crea el incidente en estado 'borrador'. No se notifica a talleres ni se ejecuta "
+        "el motor de asignación hasta que el cliente llama POST /incidencias/{id}/confirmar "
+        "tras elegir taller."
+    ),
 )
 async def reportar_incidencia(
     incidente_in: IncidenteCreate,
@@ -150,79 +168,69 @@ async def reportar_incidencia(
     current_user: Usuario = Depends(get_current_user)
 ):
     """
-    🚨 ENDPOINT CRÍTICO DEL SISTEMA 🚨
-    
-    Cuando el usuario presiona "¡Auxilio!", se ejecuta esto.
-    
-    Validaciones:
-    1. El vehículo existe
-    2. El vehículo pertenece al usuario autenticado
-    3. El vehículo está activo (no está eliminado)
-    
-    Seguridad:
-    - El id_usuario se asigna automáticamente desde el JWT (no se puede falsificar)
-    - El estado inicial siempre es "pendiente" (id=1)
-    - id_categoria e id_prioridad se rellenan después por IA (inician NULL)
-    
-    Retorna: Incidente creado con id_incidente
+    Crea el incidente como BORRADOR. El borrador:
+    - No aparece en el historial del cliente
+    - No cuenta como incidente activo
+    - No notifica a talleres
+    - Permite subir evidencias y correr IA
+
+    Sólo cuando el cliente confirma un taller (POST /incidencias/{id}/confirmar)
+    el incidente pasa a 'pendiente', se ejecuta el motor de asignación y se notifica
+    a los talleres compatibles.
     """
-    
-    # ✅ VALIDACIÓN 0: Solo 1 incidente activo por usuario
-    incidente_activo = db.query(Incidente).join(
+
+    # ✅ VALIDACIÓN: Solo 1 incidente activo (pendiente/en_proceso) por usuario
+    estado_activo_existente = db.query(Incidente).join(
         EstadoIncidente, Incidente.id_estado == EstadoIncidente.id_estado
     ).filter(
         Incidente.id_usuario == current_user.id_usuario,
         EstadoIncidente.nombre.in_(["pendiente", "en_proceso"])
     ).first()
-    if incidente_activo:
+    if estado_activo_existente:
         raise HTTPException(
             status_code=409,
             detail=(
-                f"Ya tienes un incidente activo (#{incidente_activo.id_incidente}). "
+                f"Ya tienes un incidente activo (#{estado_activo_existente.id_incidente}). "
                 "Espera a que sea atendido o cancélalo antes de reportar otro."
             ),
         )
 
-    # ✅ VALIDACIÓN 1: Verificar que el vehículo existe Y pertenece a este usuario
+    # Vehículo válido y del usuario
     vehiculo = db.query(Vehiculo).filter(
         Vehiculo.id_vehiculo == incidente_in.id_vehiculo,
         Vehiculo.id_usuario == current_user.id_usuario,
         Vehiculo.activo == True
     ).first()
-
     if not vehiculo:
         raise HTTPException(
             status_code=404,
             detail="El vehículo no existe o no te pertenece"
         )
 
-    # ✅ VALIDACIÓN 2: Límite por Usuario (Un solo incidente activo a la vez)
-    incidente_activo = db.query(Incidente).filter(
+    estado_borrador = _ensure_estado_borrador(db)
+
+    # Limpia borradores previos del mismo usuario (si abandonó un flujo anterior)
+    borradores_previos = db.query(Incidente).filter(
         Incidente.id_usuario == current_user.id_usuario,
-        Incidente.id_estado.in_([1, 2])  # 1: pendiente, 2: en_proceso
-    ).first()
+        Incidente.id_estado == estado_borrador.id_estado,
+    ).all()
+    for prev in borradores_previos:
+        db.delete(prev)
+    if borradores_previos:
+        db.flush()
 
-    if incidente_activo:
-        raise HTTPException(
-            status_code=400,
-            detail="Ya tienes una emergencia en curso. Por favor, espera a que finalice o cancélala antes de reportar otra."
-        )
-
-    # ✅ CREAR INCIDENTE
+    # Crear incidente como borrador (no se notifica a talleres)
     nuevo_incidente = Incidente(
-        id_usuario=current_user.id_usuario,  # 🔒 Del JWT, no es modificable
+        id_usuario=current_user.id_usuario,
         id_vehiculo=incidente_in.id_vehiculo,
-        id_estado=1,  # 🔒 Siempre inicia en "pendiente"
+        id_estado=estado_borrador.id_estado,
         descripcion_usuario=incidente_in.descripcion_usuario,
         latitud=incidente_in.latitud,
         longitud=incidente_in.longitud,
-        # id_categoria y id_prioridad se quedan NULL, la IA los llena después
     )
-
     db.add(nuevo_incidente)
-    db.flush()  # obtener id_incidente antes del commit
+    db.flush()
 
-    # Auto-registrar métrica con fecha_inicio
     from datetime import datetime, timezone
     metrica = Metrica(
         id_incidente=nuevo_incidente.id_incidente,
@@ -232,13 +240,123 @@ async def reportar_incidencia(
     db.commit()
     db.refresh(nuevo_incidente)
 
-    talleres_dist = matching_service.buscar_talleres_compatibles(db, nuevo_incidente)
+    # Nota: NO se ejecuta matching_service ni broadcast aquí.
+    # El cliente debe confirmar primero el taller via POST /incidencias/{id}/confirmar.
+    return nuevo_incidente
+
+
+class ConfirmarTallerRequest(BaseModel):
+    id_taller_preferido: Optional[int] = Field(
+        default=None,
+        description="ID del taller que el cliente eligió (opcional; si no se manda se hace broadcast a todos los compatibles)",
+    )
+
+
+@router.post(
+    "/{id_incidente}/confirmar",
+    response_model=IncidenteResponse,
+    summary="Confirmar el incidente borrador (taller elegido) y publicarlo",
+    description=(
+        "Promueve el incidente de 'borrador' a 'pendiente', ejecuta el motor de asignación "
+        "y notifica a los talleres compatibles. Es el paso final del flujo de reporte."
+    ),
+)
+async def confirmar_incidencia(
+    id_incidente: int,
+    payload: Optional[ConfirmarTallerRequest] = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    incidente = db.query(Incidente).filter(
+        Incidente.id_incidente == id_incidente,
+        Incidente.id_usuario == current_user.id_usuario,
+    ).first()
+    if not incidente:
+        raise HTTPException(
+            status_code=404,
+            detail="Incidente no encontrado o no te pertenece",
+        )
+
+    estado_actual = db.get(EstadoIncidente, incidente.id_estado)
+    if not estado_actual or estado_actual.nombre != "borrador":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"El incidente no está en estado borrador (estado actual: "
+                f"'{estado_actual.nombre if estado_actual else '?'}'). "
+                "Sólo los borradores pueden confirmarse."
+            ),
+        )
+
+    estado_pendiente = db.query(EstadoIncidente).filter_by(nombre="pendiente").first()
+    if not estado_pendiente:
+        raise HTTPException(status_code=500, detail="Estado 'pendiente' no existe en catálogo")
+
+    # Promover a pendiente + registrar historial
+    from app.models.incidente import HistorialEstadoIncidente
+    db.add(HistorialEstadoIncidente(
+        id_incidente=incidente.id_incidente,
+        id_estado_anterior=incidente.id_estado,
+        id_estado_nuevo=estado_pendiente.id_estado,
+        observacion="Cliente confirmó taller, incidente publicado",
+    ))
+    incidente.id_estado = estado_pendiente.id_estado
+    db.commit()
+    db.refresh(incidente)
+
+    # Ahora sí: motor de asignación + broadcast a talleres
+    talleres_dist = matching_service.buscar_talleres_compatibles(db, incidente)
     talleres = [t for t, _d in talleres_dist]
     if talleres:
-        matching_service.crear_candidatos(db, nuevo_incidente, talleres_dist)
-        await broadcast_emergencia(nuevo_incidente, talleres)
+        matching_service.crear_candidatos(db, incidente, talleres_dist)
 
-    return nuevo_incidente
+        # Si el cliente eligió un taller preferido, marcar ese candidato como seleccionado
+        if payload and payload.id_taller_preferido:
+            cand = db.query(CandidatoAsignacion).filter(
+                CandidatoAsignacion.id_incidente == incidente.id_incidente,
+                CandidatoAsignacion.id_taller == payload.id_taller_preferido,
+            ).first()
+            if cand:
+                cand.seleccionado = True
+                db.commit()
+
+        await broadcast_emergencia(incidente, talleres)
+
+    return incidente
+
+
+@router.delete(
+    "/{id_incidente}/borrador",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Descartar el borrador (cliente abandonó el flujo)",
+    description=(
+        "Borra un incidente que aún está en estado 'borrador'. Se usa cuando el cliente "
+        "sale de la pantalla de selección de taller sin confirmar."
+    ),
+)
+def descartar_borrador(
+    id_incidente: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    incidente = db.query(Incidente).filter(
+        Incidente.id_incidente == id_incidente,
+        Incidente.id_usuario == current_user.id_usuario,
+    ).first()
+    if not incidente:
+        # Idempotente: si no existe, devolvemos 204 igualmente
+        return
+
+    estado = db.get(EstadoIncidente, incidente.id_estado)
+    if not estado or estado.nombre != "borrador":
+        raise HTTPException(
+            status_code=400,
+            detail="Sólo se pueden descartar incidentes en estado borrador",
+        )
+
+    db.delete(incidente)
+    db.commit()
+    return
 
 
 @router.post(
@@ -338,10 +456,12 @@ def listar_mis_incidencias(
     Ordenadas por fecha (más reciente primero)
     """
     q = db.query(Incidente).filter(Incidente.id_usuario == current_user.id_usuario)
-    
-    # Filtrar por estado si se proporciona
+
+    # Filtrar por estado si se proporciona; si no, excluir 'borrador' siempre
     if estado:
         q = q.join(EstadoIncidente).filter(EstadoIncidente.nombre == estado)
+    else:
+        q = q.join(EstadoIncidente).filter(EstadoIncidente.nombre != "borrador")
     
     # Filtrar por rango de fechas
     if desde:

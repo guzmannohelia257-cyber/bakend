@@ -19,7 +19,7 @@ try:
     # Datos del técnico
     id_taller = 1  # Taller Excelente
     nombre_tecnico = 'Juan Pérez'
-    email_tecnico = 'tecnico.juan@taller.com'
+    email_tecnico = 'juanperez.tecnico@gmail.com'
     password_tecnico = 'tecnico123!'
     telefono = '+57 3105551111'
     id_rol = 3  # Rol de Técnico

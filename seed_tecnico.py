@@ -28,7 +28,7 @@ try:
         exit(1)
 
     # 2. Crear usuario técnico en tabla usuario (id_rol=3)
-    email_tecnico = 'tecnico.juan@taller.com'
+    email_tecnico = 'juanperez.tecnico@gmail.com'
     password_tecnico = 'tecnico123!'
     nombre_tecnico = 'Juan Pérez'
     telefono_tecnico = '+57 3105551111'

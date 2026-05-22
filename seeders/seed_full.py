@@ -1,7 +1,7 @@
 """
-Seed completo de Yary — usa los modelos SQLAlchemy del backend, así respeta
-todas las restricciones (FKs, CheckConstraints, hashing real con Argon2,
-historiales, métricas).
+Seed completo de la plataforma — usa los modelos SQLAlchemy del backend, así
+respeta todas las restricciones (FKs, CheckConstraints, hashing real con
+Argon2, historiales, métricas).
 
 Pobla:
   - Catálogos (rol, estado_incidente, estado_asignacion, prioridad, categoría, etc.)
@@ -105,6 +105,7 @@ TABLAS_A_LIMPIAR = [
 ROLES = ["cliente", "taller", "tecnico", "admin"]
 
 ESTADOS_INCIDENTE = [
+    ("borrador", "Borrador: el cliente aún no confirmó el taller"),
     ("pendiente", "Reportado, sin asignar"),
     ("en_proceso", "Taller asignado, en atención"),
     ("atendido", "Resuelto"),
@@ -134,7 +135,7 @@ ESTADOS_PAGO = ["pendiente", "procesando", "completado", "fallido", "reembolsado
 
 ADMIN = {
     "nombre": "Administrador Sistema",
-    "email": "admin@plataforma.com",
+    "email": "admin.flujoemergencia@gmail.com",
     "password": "admin123!",
     "telefono": "+591 70000000",
 }
@@ -142,7 +143,7 @@ ADMIN = {
 TALLERES = [
     {
         "nombre": "Taller Excelente",
-        "email": "gerente@tallerexcelente.com",
+        "email": "tallerexcelente.demo@gmail.com",
         "password": "taller123!",
         "telefono": "+591 70011111",
         "direccion": "Av. Cristo Redentor #500, Santa Cruz",
@@ -154,7 +155,7 @@ TALLERES = [
     },
     {
         "nombre": "Mecánica Central SC",
-        "email": "mecanica.central@talleres.test",
+        "email": "mecanicacentralsc.demo@gmail.com",
         "password": "taller123!",
         "telefono": "+591 70022222",
         "direccion": "2do Anillo y Av. Alemana, Santa Cruz",
@@ -165,7 +166,7 @@ TALLERES = [
     },
     {
         "nombre": "Llantería El Cristo",
-        "email": "llanteria.cristo@talleres.test",
+        "email": "llanteriaelcristo.demo@gmail.com",
         "password": "taller123!",
         "telefono": "+591 70033333",
         "direccion": "Av. Cristo Redentor km 4",
@@ -179,48 +180,48 @@ TALLERES = [
 # 2 técnicos por taller (índice 0..2)
 TECNICOS = [
     # Taller 1
-    {"nombre": "Juan Pérez",     "email": "tecnico.juan@taller.com",     "password": "tecnico123!", "telefono": "+591 71011111", "taller_idx": 0},
-    {"nombre": "Carlos Gómez",   "email": "tecnico.carlos@taller.com",   "password": "tecnico123!", "telefono": "+591 71011112", "taller_idx": 0},
+    {"nombre": "Juan Pérez",     "email": "juanperez.tecnico@gmail.com",     "password": "tecnico123!", "telefono": "+591 71011111", "taller_idx": 0},
+    {"nombre": "Carlos Gómez",   "email": "carlosgomez.tecnico@gmail.com",   "password": "tecnico123!", "telefono": "+591 71011112", "taller_idx": 0},
     # Taller 2
-    {"nombre": "Luis Rodríguez", "email": "tecnico.luis@taller.com",     "password": "tecnico123!", "telefono": "+591 71022221", "taller_idx": 1},
-    {"nombre": "Mario López",    "email": "tecnico.mario@taller.com",    "password": "tecnico123!", "telefono": "+591 71022222", "taller_idx": 1},
+    {"nombre": "Luis Rodríguez", "email": "luisrodriguez.tecnico@gmail.com", "password": "tecnico123!", "telefono": "+591 71022221", "taller_idx": 1},
+    {"nombre": "Mario López",    "email": "mariolopez.tecnico@gmail.com",    "password": "tecnico123!", "telefono": "+591 71022222", "taller_idx": 1},
     # Taller 3
-    {"nombre": "Pedro Vargas",   "email": "tecnico.pedro@taller.com",    "password": "tecnico123!", "telefono": "+591 71033331", "taller_idx": 2},
-    {"nombre": "Diego Mamani",   "email": "tecnico.diego@taller.com",    "password": "tecnico123!", "telefono": "+591 71033332", "taller_idx": 2},
+    {"nombre": "Pedro Vargas",   "email": "pedrovargas.tecnico@gmail.com",   "password": "tecnico123!", "telefono": "+591 71033331", "taller_idx": 2},
+    {"nombre": "Diego Mamani",   "email": "diegomamani.tecnico@gmail.com",   "password": "tecnico123!", "telefono": "+591 71033332", "taller_idx": 2},
 ]
 
 CLIENTES = [
     {
         "nombre": "Juan Conductor",
-        "email": "conductor@ejemplo.com",
+        "email": "juanconductor.cliente@gmail.com",
         "password": "cliente123!",
         "telefono": "+591 70111001",
         "vehiculo": {"placa": "SCZ-001", "marca": "Toyota", "modelo": "Corolla", "anio": 2021, "color": "Blanco"},
     },
     {
         "nombre": "Ana Pérez",
-        "email": "ana.cliente@ejemplo.com",
+        "email": "anaperez.cliente@gmail.com",
         "password": "cliente123!",
         "telefono": "+591 70111002",
         "vehiculo": {"placa": "SCZ-002", "marca": "Nissan", "modelo": "Sentra", "anio": 2020, "color": "Rojo"},
     },
     {
         "nombre": "Pedro Ramírez",
-        "email": "pedro.cliente@ejemplo.com",
+        "email": "pedroramirez.cliente@gmail.com",
         "password": "cliente123!",
         "telefono": "+591 70111003",
         "vehiculo": {"placa": "SCZ-003", "marca": "Suzuki", "modelo": "Swift", "anio": 2022, "color": "Azul"},
     },
     {
         "nombre": "María Flores",
-        "email": "maria.cliente@ejemplo.com",
+        "email": "mariaflores.cliente@gmail.com",
         "password": "cliente123!",
         "telefono": "+591 70111004",
         "vehiculo": {"placa": "SCZ-004", "marca": "Kia", "modelo": "Picanto", "anio": 2023, "color": "Negro"},
     },
     {
         "nombre": "Carlos Quispe",
-        "email": "carlos.cliente@ejemplo.com",
+        "email": "carlosquispe.cliente@gmail.com",
         "password": "cliente123!",
         "telefono": "+591 70111005",
         "vehiculo": {"placa": "SCZ-005", "marca": "Chevrolet", "modelo": "Spark", "anio": 2019, "color": "Gris"},
@@ -229,7 +230,7 @@ CLIENTES = [
 
 # Cinco escenarios — 1 incidente por cliente, sin solapamiento de activos.
 # taller_idx=0 (Taller Excelente) recibe la evaluación para que las estrellas
-# aparezcan en el dashboard cuando el usuario loguea como gerente@tallerexcelente.com
+# aparezcan en el dashboard cuando el usuario loguea como tallerexcelente.demo@gmail.com
 INCIDENTES = [
     {
         "cliente_idx": 0,

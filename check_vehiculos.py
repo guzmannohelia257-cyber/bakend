@@ -7,7 +7,7 @@ engine = create_engine(settings.DATABASE_URL)
 with engine.connect() as conn:
     # Obtener usuario
     query = text("""
-        SELECT id_usuario, nombre, email FROM usuario WHERE email = 'conductor@ejemplo.com'
+        SELECT id_usuario, nombre, email FROM usuario WHERE email = 'juanconductor.cliente@gmail.com'
     """)
     usuario = conn.execute(query).first()
     

@@ -74,6 +74,7 @@ cur.execute("""
 
 cur.execute("""
     INSERT INTO estado_incidente (nombre, descripcion) VALUES
+        ('borrador',    'Borrador: el cliente aún no confirmó el taller'),
         ('pendiente',   'Reportado, sin asignar'),
         ('en_proceso',  'Taller asignado, en atención'),
         ('atendido',    'Resuelto'),
@@ -123,12 +124,12 @@ print("✅ Catálogos creados")
 # ──────────────────────────────────────────────────────────────────────────────
 cur.execute("""
     INSERT INTO usuario (id_rol, nombre, email, telefono, password_hash, activo)
-    VALUES (1, 'Juan Conductor', 'conductor@ejemplo.com', '+57 3001234567', %s, TRUE);
+    VALUES (1, 'Juan Conductor', 'juanconductor.cliente@gmail.com', '+57 3001234567', %s, TRUE);
 """, (ph.hash('cliente123!'),))
 
 cur.execute("""
     INSERT INTO usuario (id_rol, nombre, email, telefono, password_hash, activo)
-    VALUES (4, 'Administrador Sistema', 'admin@plataforma.com', '+57 3009999999', %s, TRUE);
+    VALUES (4, 'Administrador Sistema', 'admin.flujoemergencia@gmail.com', '+57 3009999999', %s, TRUE);
 """, (ph.hash('admin123!'),))
 
 print("✅ Usuarios base creados (cliente + admin)")
@@ -142,7 +143,7 @@ cur.execute("""
                         capacidad_max, disponible, activo, verificado)
     VALUES (
         'Taller Excelente',
-        'gerente@tallerexcelente.com',
+        'tallerexcelente.demo@gmail.com',
         '+57 3105552222',
         %s,
         -17.8454274, -63.1561987,
@@ -156,12 +157,12 @@ print("✅ Taller creado")
 # ──────────────────────────────────────────────────────────────────────────────
 # 5. TÉCNICOS — usuarios con id_rol=3 vinculados al taller via usuario_taller
 # ──────────────────────────────────────────────────────────────────────────────
-cur.execute("SELECT id_taller FROM taller WHERE email = 'gerente@tallerexcelente.com';")
+cur.execute("SELECT id_taller FROM taller WHERE email = 'tallerexcelente.demo@gmail.com';")
 id_taller = cur.fetchone()[0]
 
 tecnicos = [
-    ("Juan Pérez - Técnico",   "tecnico.juan@taller.com",   "+57 3105551111", "tecnico123!"),
-    ("Carlos Gómez - Técnico", "tecnico.carlos@taller.com", "+57 3105551112", "tecnico456!"),
+    ("Juan Pérez - Técnico",   "juanperez.tecnico@gmail.com",   "+57 3105551111", "tecnico123!"),
+    ("Carlos Gómez - Técnico", "carlosgomez.tecnico@gmail.com", "+57 3105551112", "tecnico456!"),
 ]
 
 for nombre, email, telefono, password in tecnicos:
@@ -203,23 +204,23 @@ for tabla in TABLAS_RESUMEN:
 print('=' * 70)
 print('\n📱 CREDENCIALES DE LOGIN\n')
 print('  🔵 CLIENTE (App Móvil Flutter)')
-print('     Email:    conductor@ejemplo.com')
+print('     Email:    juanconductor.cliente@gmail.com')
 print('     Password: cliente123!')
 print('     Endpoint: POST /usuarios/login')
 print()
 print('  🔴 ADMIN (Panel Web Angular)')
-print('     Email:    admin@plataforma.com')
+print('     Email:    admin.flujoemergencia@gmail.com')
 print('     Password: admin123!')
 print('     Endpoint: POST /usuarios/login')
 print()
 print('  🟡 TALLER (Panel Web Angular)')
-print('     Email:    gerente@tallerexcelente.com')
+print('     Email:    tallerexcelente.demo@gmail.com')
 print('     Password: taller123!')
 print('     Endpoint: POST /talleres/login')
 print()
 print('  🔧 TÉCNICOS (App Móvil Flutter — misma pantalla que cliente)')
-print('     Email:    tecnico.juan@taller.com   / tecnico123!')
-print('     Email:    tecnico.carlos@taller.com / tecnico456!')
+print('     Email:    juanperez.tecnico@gmail.com   / tecnico123!')
+print('     Email:    carlosgomez.tecnico@gmail.com / tecnico456!')
 print('     Endpoint: POST /usuarios/login  (redirige a pantalla técnico si rol=3)')
 print()
 print('  ⚙️  SIGUIENTE PASO (opcional): python seed_estados_prueba.py')
