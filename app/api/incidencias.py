@@ -151,6 +151,63 @@ def _ensure_estado_borrador(db: Session) -> EstadoIncidente:
     return estado
 
 
+def _borrar_incidentes_y_dependencias(db: Session, ids: list[int]) -> None:
+    """
+    Borra incidentes + todas sus filas hijas en orden seguro.
+    Las FK no tienen ON DELETE CASCADE, así que hay que hacerlo a mano.
+    """
+    if not ids:
+        return
+    from app.models.incidente import (
+        Asignacion as _Asignacion,
+        CandidatoAsignacion as _CandidatoAsignacion,
+        Evidencia as _Evidencia,
+        HistorialEstadoAsignacion as _HEA,
+        HistorialEstadoIncidente as _HEI,
+    )
+    from app.models.transaccional import (
+        Mensaje as _Mensaje,
+        Metrica as _Metrica,
+        Notificacion as _Notificacion,
+        Pago as _Pago,
+    )
+
+    asignacion_ids = [
+        row[0]
+        for row in db.query(_Asignacion.id_asignacion)
+        .filter(_Asignacion.id_incidente.in_(ids))
+        .all()
+    ]
+    if asignacion_ids:
+        db.query(_HEA).filter(_HEA.id_asignacion.in_(asignacion_ids)).delete(
+            synchronize_session=False
+        )
+    db.query(_HEI).filter(_HEI.id_incidente.in_(ids)).delete(synchronize_session=False)
+    db.query(_CandidatoAsignacion).filter(
+        _CandidatoAsignacion.id_incidente.in_(ids)
+    ).delete(synchronize_session=False)
+    db.query(_Asignacion).filter(_Asignacion.id_incidente.in_(ids)).delete(
+        synchronize_session=False
+    )
+    db.query(_Evidencia).filter(_Evidencia.id_incidente.in_(ids)).delete(
+        synchronize_session=False
+    )
+    db.query(_Metrica).filter(_Metrica.id_incidente.in_(ids)).delete(
+        synchronize_session=False
+    )
+    db.query(_Notificacion).filter(_Notificacion.id_incidente.in_(ids)).delete(
+        synchronize_session=False
+    )
+    db.query(_Mensaje).filter(_Mensaje.id_incidente.in_(ids)).delete(
+        synchronize_session=False
+    )
+    db.query(_Pago).filter(_Pago.id_incidente.in_(ids)).delete(synchronize_session=False)
+    db.query(Incidente).filter(Incidente.id_incidente.in_(ids)).delete(
+        synchronize_session=False
+    )
+    db.commit()
+
+
 @router.post(
     "/",
     response_model=IncidenteResponse,
@@ -219,65 +276,7 @@ async def reportar_incidencia(
         ).all()
     ]
     if borradores_previos_ids:
-        # Borramos hijos en orden seguro antes del padre (FK sin cascade).
-        # historial_* primero porque referencian asignacion, luego asignacion,
-        # luego candidato/evidencia/metrica/etc., y al final el incidente.
-        from app.models.incidente import (
-            Asignacion as _Asignacion,
-            CandidatoAsignacion as _CandidatoAsignacion,
-            Evidencia as _Evidencia,
-            HistorialEstadoAsignacion as _HEA,
-            HistorialEstadoIncidente as _HEI,
-        )
-        from app.models.transaccional import (
-            Mensaje as _Mensaje,
-            Metrica as _Metrica,
-            Notificacion as _Notificacion,
-            Pago as _Pago,
-        )
-
-        # Historial de asignaciones referencia asignaciones → primero
-        asignacion_ids = [
-            row[0]
-            for row in db.query(_Asignacion.id_asignacion).filter(
-                _Asignacion.id_incidente.in_(borradores_previos_ids)
-            ).all()
-        ]
-        if asignacion_ids:
-            db.query(_HEA).filter(
-                _HEA.id_asignacion.in_(asignacion_ids)
-            ).delete(synchronize_session=False)
-
-        db.query(_HEI).filter(
-            _HEI.id_incidente.in_(borradores_previos_ids)
-        ).delete(synchronize_session=False)
-        db.query(_CandidatoAsignacion).filter(
-            _CandidatoAsignacion.id_incidente.in_(borradores_previos_ids)
-        ).delete(synchronize_session=False)
-        db.query(_Asignacion).filter(
-            _Asignacion.id_incidente.in_(borradores_previos_ids)
-        ).delete(synchronize_session=False)
-        db.query(_Evidencia).filter(
-            _Evidencia.id_incidente.in_(borradores_previos_ids)
-        ).delete(synchronize_session=False)
-        db.query(_Metrica).filter(
-            _Metrica.id_incidente.in_(borradores_previos_ids)
-        ).delete(synchronize_session=False)
-        db.query(_Notificacion).filter(
-            _Notificacion.id_incidente.in_(borradores_previos_ids)
-        ).delete(synchronize_session=False)
-        db.query(_Mensaje).filter(
-            _Mensaje.id_incidente.in_(borradores_previos_ids)
-        ).delete(synchronize_session=False)
-        db.query(_Pago).filter(
-            _Pago.id_incidente.in_(borradores_previos_ids)
-        ).delete(synchronize_session=False)
-
-        # Finalmente, el incidente padre.
-        db.query(Incidente).filter(
-            Incidente.id_incidente.in_(borradores_previos_ids)
-        ).delete(synchronize_session=False)
-        db.commit()
+        _borrar_incidentes_y_dependencias(db, borradores_previos_ids)
 
     # Crear incidente como borrador (no se notifica a talleres)
     nuevo_incidente = Incidente(
@@ -439,8 +438,7 @@ def descartar_borrador(
             detail="Sólo se pueden descartar incidentes en estado borrador",
         )
 
-    db.delete(incidente)
-    db.commit()
+    _borrar_incidentes_y_dependencias(db, [incidente.id_incidente])
     return
 
 
