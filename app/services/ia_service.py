@@ -15,7 +15,8 @@ logging.basicConfig(level=logging.INFO)
 from app.core.config import get_settings
 from app.models.incidente import Incidente, Evidencia
 from app.models.catalogos import CategoriaProblema, Prioridad, TipoEvidencia
-from app.services.asignacion import buscar_y_asignar
+# Nota: ya NO importamos buscar_y_asignar. El matching corre solo en
+# POST /incidencias/{id}/confirmar tras la seleccion explicita del cliente.
 
 settings = get_settings()
 
@@ -226,13 +227,12 @@ Analiza las evidencias (imagenes adjuntas) junto con el texto y responde con el 
     db.commit()
     db.refresh(incidente)
 
-    # 🎯 Motor de Asignación Inteligente: Buscar talleres cercanos
-    logger.info(f"[IA] Incidente {incidente.id_incidente} clasificado. Ejecutando motor de asignación...")
-    try:
-        resultado_asignacion = buscar_y_asignar(db, incidente)
-        logger.info(f"[IA] Asignación: {resultado_asignacion}")
-    except Exception as e:
-        logger.warning(f"[IA] Error en motor de asignación: {e}")
+    # Nota: el motor de asignacion (buscar_y_asignar) NO corre aquí. El cliente
+    # debe elegir explícitamente un taller en la pantalla de seleccion; el
+    # endpoint POST /incidencias/{id}/confirmar es el que dispara matching y
+    # broadcast. Mantener el match aquí re-creaba una `asignacion` en estado
+    # pendiente antes de la confirmación y rompía el flujo de borrador.
+    logger.info(f"[IA] Incidente {incidente.id_incidente} clasificado. Esperando confirmacion de taller del cliente.")
 
     return {
         "id_categoria": id_categoria,
