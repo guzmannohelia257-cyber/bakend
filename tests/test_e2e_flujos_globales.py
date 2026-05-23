@@ -387,6 +387,123 @@ def test_taller_no_ve_asignaciones_de_otro_tenant(
     )
 
 
+def test_taller_acepta_via_endpoint_legado_promueve_asignacion_existente(
+    client,
+    db_session,
+    tenant_factory,
+    taller_factory,
+    cliente_factory,
+    vehiculo_factory,
+    cliente_auth_headers,
+    taller_auth_headers,
+):
+    """
+    Bug reportado: el dashboard del taller usa POST /incidencias/{id}/aceptar
+    (con id_incidente, no id_asignacion). Antes este endpoint creaba SIEMPRE
+    una asignacion nueva y devolvía 409 si ya había una -> tras el nuevo
+    flujo de borrador->confirmar (donde /confirmar ya crea asignacion en
+    pendiente para el taller elegido), el botón Aceptar del dashboard
+    siempre devolvía 409.
+
+    Fix: si la asignacion existente es para ESTE taller y está en pendiente,
+    el endpoint la promueve a aceptada (no falla con 409).
+    """
+    _ensure_estados(db_session)
+
+    from app.models.catalogos import CategoriaProblema
+    from app.models.incidente import Asignacion
+
+    cat = db_session.query(CategoriaProblema).first()
+    _, taller = _crear_taller_con_categoria(
+        db_session, tenant_factory, taller_factory, cat, -17.78, -63.18,
+    )
+    cliente = cliente_factory()
+    vehiculo = vehiculo_factory(cliente)
+    headers_cli = cliente_auth_headers(cliente)
+    headers_taller = taller_auth_headers(taller)
+
+    id_inc = _crear_borrador_y_confirmar(
+        client, db_session, cliente, vehiculo, cat, taller, headers_cli,
+    )
+
+    # Tras /confirmar existe UNA asignacion en pendiente para este taller
+    asig_antes = db_session.query(Asignacion).filter_by(id_incidente=id_inc).one()
+    assert asig_antes.estado.nombre == "pendiente"
+    assert asig_antes.id_taller == taller.id_taller
+
+    # Taller llama al endpoint legado (mismo que usa el botón "Aceptar live")
+    r = client.post(
+        f"/incidencias/{id_inc}/aceptar",
+        headers=headers_taller,
+    )
+    assert r.status_code == 200, (
+        f"Esperábamos 200 (promueve la pendiente a aceptada), "
+        f"vino {r.status_code}: {r.text}"
+    )
+    assert r.json()["nuevo_estado"] == "aceptada"
+
+    # No se creó una asignación nueva: la existente cambió de estado.
+    db_session.expire_all()
+    asignaciones = db_session.query(Asignacion).filter_by(id_incidente=id_inc).all()
+    assert len(asignaciones) == 1, (
+        f"No debe haber asignaciones duplicadas. Hay {len(asignaciones)}"
+    )
+    assert asignaciones[0].estado.nombre == "aceptada"
+
+
+def test_otro_taller_intenta_aceptar_si_ya_hay_asignacion_devuelve_409(
+    client,
+    db_session,
+    tenant_factory,
+    taller_factory,
+    cliente_factory,
+    vehiculo_factory,
+    cliente_auth_headers,
+    taller_auth_headers,
+):
+    """
+    Si el cliente ya eligió taller A (asignacion en pendiente para A) y otro
+    taller B intenta tomar el broadcast vía endpoint legado, debe responder
+    409 (no se "roba" la emergencia).
+    """
+    _ensure_estados(db_session)
+
+    from app.models.catalogos import CategoriaProblema
+    from app.models.incidente import CandidatoAsignacion
+
+    cat = db_session.query(CategoriaProblema).first()
+    _, taller_a = _crear_taller_con_categoria(
+        db_session, tenant_factory, taller_factory, cat, -17.78, -63.18,
+    )
+    _, taller_b = _crear_taller_con_categoria(
+        db_session, tenant_factory, taller_factory, cat, -17.79, -63.19,
+    )
+
+    cliente = cliente_factory()
+    vehiculo = vehiculo_factory(cliente)
+    headers_cli = cliente_auth_headers(cliente)
+
+    id_inc = _crear_borrador_y_confirmar(
+        client, db_session, cliente, vehiculo, cat, taller_a, headers_cli,
+    )
+
+    # Verificamos que B es candidato (matching lo incluyó)
+    cands_b = db_session.query(CandidatoAsignacion).filter_by(
+        id_incidente=id_inc, id_taller=taller_b.id_taller,
+    ).first()
+    if cands_b is None:
+        # Si B no quedó como candidato (por radio/categoría), el test no aplica
+        import pytest
+        pytest.skip("Taller B no quedó como candidato en este escenario")
+
+    # B intenta tomar el broadcast
+    r = client.post(
+        f"/incidencias/{id_inc}/aceptar",
+        headers=taller_auth_headers(taller_b),
+    )
+    assert r.status_code == 409, r.text
+
+
 def test_cliente_no_puede_ver_incidente_de_otro_cliente(
     client,
     db_session,

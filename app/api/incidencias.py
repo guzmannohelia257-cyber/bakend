@@ -471,21 +471,43 @@ async def aceptar_emergencia(
         if not cand:
             raise HTTPException(403, "Tu taller no fue convocado a esta emergencia")
 
+        estado_aceptada = db.query(EstadoAsignacion).filter_by(nombre="aceptada").one()
+        estado_pendiente = db.query(EstadoAsignacion).filter_by(nombre="pendiente").first()
+
+        # Hay tres casos:
+        # 1. Ya existe asignacion en pendiente para ESTE taller (creada por
+        #    /confirmar tras la elección del cliente) -> la transicionamos
+        #    a 'aceptada'.
+        # 2. Ya existe asignacion en otro estado (aceptada, en_camino, etc.)
+        #    -> 409, ya fue tomada por otro.
+        # 3. No existe asignacion -> creamos una nueva en 'aceptada' (flujo
+        #    legado: el taller toma el broadcast sin confirmación previa).
         existing = db.query(Asignacion).filter_by(id_incidente=id_incidente).first()
         if existing:
-            raise HTTPException(
-                409,
-                f"Esta emergencia ya fue tomada por el taller {existing.id_taller}",
+            es_de_este_taller = existing.id_taller == current_taller.id_taller
+            es_pendiente = (
+                estado_pendiente is not None
+                and existing.id_estado_asignacion == estado_pendiente.id_estado_asignacion
             )
-
-        estado_aceptada = db.query(EstadoAsignacion).filter_by(nombre="aceptada").one()
-        asig = Asignacion(
-            id_tenant=current_taller.id_tenant,
-            id_incidente=id_incidente,
-            id_taller=current_taller.id_taller,
-            id_estado_asignacion=estado_aceptada.id_estado_asignacion,
-        )
-        db.add(asig)
+            if es_de_este_taller and es_pendiente:
+                # Caso 1: promovemos la pendiente a aceptada.
+                existing.id_estado_asignacion = estado_aceptada.id_estado_asignacion
+                asig = existing
+            else:
+                # Caso 2: ya tomada por otro o en otro estado terminal.
+                raise HTTPException(
+                    409,
+                    f"Esta emergencia ya fue tomada por el taller {existing.id_taller}",
+                )
+        else:
+            # Caso 3: aceptación directa sin confirmación previa del cliente.
+            asig = Asignacion(
+                id_tenant=current_taller.id_tenant,
+                id_incidente=id_incidente,
+                id_taller=current_taller.id_taller,
+                id_estado_asignacion=estado_aceptada.id_estado_asignacion,
+            )
+            db.add(asig)
 
         cand.seleccionado = True
         inc.id_tenant = current_taller.id_tenant
