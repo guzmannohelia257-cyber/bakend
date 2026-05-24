@@ -47,6 +47,8 @@ class CotizacionResponse(BaseModel):
     id_estado_cotizacion: int
     monto_servicio: Optional[float] = None
     monto_repuestos: Optional[float] = None
+    distancia_km: Optional[float] = None
+    monto_traslado: Optional[float] = None
     garantia_dias: Optional[int] = None
     tiempo_estimado_min: Optional[int] = None
     nota: Optional[str] = None
@@ -61,7 +63,11 @@ class CotizacionResponse(BaseModel):
     def monto_total(self) -> Optional[float]:
         if self.monto_servicio is None:
             return None
-        return float(self.monto_servicio) + float(self.monto_repuestos or 0)
+        return (
+            float(self.monto_servicio)
+            + float(self.monto_repuestos or 0)
+            + float(self.monto_traslado or 0)
+        )
 
 
 class CotizacionesSolicitadasResponse(BaseModel):

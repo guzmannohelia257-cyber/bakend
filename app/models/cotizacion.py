@@ -38,6 +38,8 @@ class Cotizacion(Base):
 
     monto_servicio = Column(Numeric(10, 2), nullable=True)
     monto_repuestos = Column(Numeric(10, 2), nullable=True, default=0)
+    distancia_km = Column(Numeric(6, 2), nullable=True)
+    monto_traslado = Column(Numeric(10, 2), nullable=True, default=0)
     garantia_dias = Column(Integer, nullable=True)
     tiempo_estimado_min = Column(Integer, nullable=True)
     nota = Column(Text, nullable=True)
@@ -54,4 +56,5 @@ class Cotizacion(Base):
     def monto_total(self) -> float:
         s = self.monto_servicio or 0
         r = self.monto_repuestos or 0
-        return float(s) + float(r)
+        t = self.monto_traslado or 0
+        return float(s) + float(r) + float(t)

@@ -128,8 +128,34 @@ def responder_cotizacion(
         _marcar_expirada(db, cotizacion)
         raise HTTPException(410, "Esta cotizacion ya expiro")
 
+    # Calcular el traslado: distancia GPS entre taller e incidente * tarifa_traslado.
+    # Es lo que rompia el desglose: el cliente veia solo servicio+repuestos.
+    incidente = db.query(Incidente).get(cotizacion.id_incidente)
+    distancia = None
+    traslado = 0.0
+    if (
+        incidente is not None
+        and incidente.latitud is not None
+        and incidente.longitud is not None
+        and taller.latitud is not None
+        and taller.longitud is not None
+    ):
+        distancia = round(
+            _haversine_km(
+                float(incidente.latitud),
+                float(incidente.longitud),
+                float(taller.latitud),
+                float(taller.longitud),
+            ),
+            2,
+        )
+        tarifa_km = float(taller.tarifa_traslado or 0)
+        traslado = round(tarifa_km * distancia, 2)
+
     cotizacion.monto_servicio = monto_servicio
     cotizacion.monto_repuestos = monto_repuestos
+    cotizacion.distancia_km = distancia
+    cotizacion.monto_traslado = traslado
     cotizacion.garantia_dias = garantia_dias
     cotizacion.tiempo_estimado_min = tiempo_estimado_min
     cotizacion.nota = nota

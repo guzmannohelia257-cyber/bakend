@@ -12,7 +12,7 @@ from typing import Optional, List
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request, Header, status
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -199,7 +199,16 @@ def crear_payment_intent(
         )
 
     estado_pendiente = _get_estado_pago_id(db, "pendiente")
-    pago = db.query(Pago).filter(Pago.id_incidente == payload.id_incidente).first()
+    # Filtrar por tipo='servicio': evita machacar un Pago tipo='preauth' o
+    # 'penalizacion' que pudo crearse para el mismo incidente.
+    pago = (
+        db.query(Pago)
+        .filter(
+            Pago.id_incidente == payload.id_incidente,
+            Pago.tipo == "servicio",
+        )
+        .first()
+    )
 
     if pago:
         pago.id_metodo_pago = payload.id_metodo_pago
@@ -213,6 +222,7 @@ def crear_payment_intent(
             id_incidente=payload.id_incidente,
             id_metodo_pago=payload.id_metodo_pago,
             id_estado_pago=estado_pendiente,
+            tipo="servicio",
             monto_total=payload.monto_total,
             comision_plataforma=0,
             monto_taller=payload.monto_total,
@@ -365,7 +375,12 @@ def listar_mis_pagos(
         db.query(Incidente, Asignacion, Pago, EstadoPago)
         .outerjoin(sub_asig_completada, sub_asig_completada.c.id_incidente == Incidente.id_incidente)
         .outerjoin(Asignacion, Asignacion.id_asignacion == sub_asig_completada.c.id_asignacion)
-        .outerjoin(Pago, Pago.id_incidente == Incidente.id_incidente)
+        # Filtrar tipo='servicio': sin este filtro un mismo incidente que tenga
+        # tambien Pago tipo='preauth' o 'penalizacion' aparece duplicado.
+        .outerjoin(
+            Pago,
+            and_(Pago.id_incidente == Incidente.id_incidente, Pago.tipo == "servicio"),
+        )
         .outerjoin(EstadoPago, EstadoPago.id_estado_pago == Pago.id_estado_pago)
         .filter(Incidente.id_usuario == current_user.id_usuario)
         .filter(or_(Pago.id_pago.isnot(None), sub_asig_completada.c.id_asignacion.isnot(None)))
@@ -493,7 +508,11 @@ def obtener_pago(
             detail="No puedes consultar pagos de un incidente que no te pertenece",
         )
 
-    pago = db.query(Pago).filter(Pago.id_incidente == id_incidente).first()
+    pago = (
+        db.query(Pago)
+        .filter(Pago.id_incidente == id_incidente, Pago.tipo == "servicio")
+        .first()
+    )
     if not pago:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

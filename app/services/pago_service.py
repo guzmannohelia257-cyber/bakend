@@ -7,15 +7,18 @@ Servicio de Pagos extendido (segundo parcial):
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
 import stripe
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.catalogos import EstadoPago, MetodoPago
+from app.models.cotizacion import Cotizacion, EstadoCotizacion
 from app.models.incidente import Asignacion, Incidente
 from app.models.taller import TallerServicio
 from app.models.transaccional import Pago
@@ -23,6 +26,8 @@ from app.models.transaccional import Pago
 
 PENALIZACION_FIJA_USD = Decimal("5.00")
 ESTIMACION_FALLBACK_USD = Decimal("20.00")
+ESTIMACION_HISTORICO_DIAS = 90
+ESTIMACION_HISTORICO_MINIMO = 3
 
 
 def _estado_pago_id(db: Session, nombre: str) -> int:
@@ -41,14 +46,39 @@ def _metodo_default(db: Session) -> int:
 
 def estimar_costo(db: Session, incidente: Incidente) -> Decimal:
     """
-    Estima el costo referencial a partir de:
-      1. La categoria IA del incidente.
-      2. El promedio de tarifa_base entre talleres que ofrecen esa categoria.
-      3. Fallback de USD 20 si no hay tarifas registradas.
+    Estima el costo referencial. Prioridad:
+      1. Promedio de cotizaciones ACEPTADAS de la misma categoria en los
+         ultimos 90 dias (aprendizaje de trabajos reales). Solo si hay >= 3.
+      2. Promedio de tarifa_base entre talleres que ofrecen esa categoria.
+      3. Fallback de USD 20.
     """
     if not incidente.id_categoria:
         return ESTIMACION_FALLBACK_USD
 
+    # 1. Historico de cotizaciones aceptadas
+    desde = datetime.now(timezone.utc) - timedelta(days=ESTIMACION_HISTORICO_DIAS)
+    hist_query = (
+        db.query(
+            func.count(Cotizacion.id_cotizacion),
+            func.avg(
+                func.coalesce(Cotizacion.monto_servicio, 0)
+                + func.coalesce(Cotizacion.monto_repuestos, 0)
+                + func.coalesce(Cotizacion.monto_traslado, 0)
+            ),
+        )
+        .join(Incidente, Incidente.id_incidente == Cotizacion.id_incidente)
+        .join(EstadoCotizacion, EstadoCotizacion.id_estado_cotizacion == Cotizacion.id_estado_cotizacion)
+        .filter(
+            Incidente.id_categoria == incidente.id_categoria,
+            EstadoCotizacion.nombre == "aceptada",
+            Cotizacion.created_at >= desde,
+        )
+    )
+    n_hist, prom_hist = hist_query.one()
+    if n_hist and n_hist >= ESTIMACION_HISTORICO_MINIMO and prom_hist:
+        return Decimal(str(prom_hist)).quantize(Decimal("0.01"))
+
+    # 2. Promedio de tarifa_base de talleres
     tarifas = (
         db.query(TallerServicio.tarifa_base)
         .filter(

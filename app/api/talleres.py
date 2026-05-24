@@ -148,7 +148,7 @@ def actualizar_disponibilidad(
 @router.patch(
     "/mi-taller/tarifa-traslado",
     response_model=TallerResponse,
-    summary="Actualizar mi tarifa de traslado (compensacion por cancelaciones)",
+    summary="Actualizar mi tarifa por kilometro (se suma a cada cotizacion segun la distancia)",
 )
 def actualizar_tarifa_traslado(
     body: TarifaTrasladoUpdate,
