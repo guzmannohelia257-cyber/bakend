@@ -3,6 +3,8 @@
 - Anade columnas a categoria_problema: codigo (unique), requiere_cotizacion.
 - Anade columna tarifa_base a taller_servicio.
 - Upsertea las 7 categorias oficiales del enunciado.
+
+Idempotente: comprueba existencia de columnas y constraints antes de crearlos.
 """
 from typing import Sequence, Union
 
@@ -27,12 +29,27 @@ CATEGORIAS = [
 ]
 
 
+def _has_column(bind, table: str, col: str) -> bool:
+    return col in {c["name"] for c in sa.inspect(bind).get_columns(table)}
+
+
+def _has_constraint(bind, name: str) -> bool:
+    return bind.execute(
+        sa.text("SELECT 1 FROM pg_constraint WHERE conname = :n"),
+        {"n": name},
+    ).scalar() is not None
+
+
 def upgrade() -> None:
-    op.add_column("categoria_problema", sa.Column("codigo", sa.String(length=50), nullable=True))
-    op.add_column(
-        "categoria_problema",
-        sa.Column("requiere_cotizacion", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-    )
+    bind = op.get_bind()
+
+    if not _has_column(bind, "categoria_problema", "codigo"):
+        op.add_column("categoria_problema", sa.Column("codigo", sa.String(length=50), nullable=True))
+    if not _has_column(bind, "categoria_problema", "requiere_cotizacion"):
+        op.add_column(
+            "categoria_problema",
+            sa.Column("requiere_cotizacion", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        )
 
     for codigo, nombre, desc, requiere in CATEGORIAS:
         op.execute(
@@ -56,9 +73,11 @@ def upgrade() -> None:
             ).bindparams(codigo=codigo, nombre=nombre, req=requiere)
         )
 
-    op.create_unique_constraint("uq_categoria_codigo", "categoria_problema", ["codigo"])
+    if not _has_constraint(bind, "uq_categoria_codigo"):
+        op.create_unique_constraint("uq_categoria_codigo", "categoria_problema", ["codigo"])
 
-    op.add_column("taller_servicio", sa.Column("tarifa_base", sa.Numeric(10, 2), nullable=True))
+    if not _has_column(bind, "taller_servicio", "tarifa_base"):
+        op.add_column("taller_servicio", sa.Column("tarifa_base", sa.Numeric(10, 2), nullable=True))
 
 
 def downgrade() -> None:

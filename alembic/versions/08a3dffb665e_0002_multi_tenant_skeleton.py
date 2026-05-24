@@ -6,10 +6,8 @@ Crea la infraestructura de multi-tenant (Fase 1):
     evidencia, evaluacion, mensaje, notificacion, pago, metrica
   - Seed de planes por defecto (free, pro, enterprise)
 
-NO toca timestamps ni indices preexistentes (eso queda como tarea aparte de
-"harmonizacion" para no mezclar cambios).
-
-Idempotente sobre tablas: comprueba existencia donde aplica.
+Idempotente: comprueba existencia de tablas, columnas, indices y constraints
+antes de crearlos. Seguro de ejecutar contra BD que ya tenga estas tablas.
 
 Revision ID: 08a3dffb665e
 Revises: 518378145d58
@@ -22,15 +20,12 @@ from alembic import op
 import sqlalchemy as sa
 
 
-# revision identifiers, used by Alembic.
 revision: str = "08a3dffb665e"
 down_revision: Union[str, None] = "518378145d58"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-# Tablas a las que se les anade id_tenant + FK + indice.
-# (nombre_tabla, nombre_constraint_fk, nombre_indice)
 TENANT_SCOPED_TABLES = [
     ("taller", "fk_taller_tenant", "ix_taller_id_tenant"),
     ("incidente", "fk_incidente_tenant", "ix_incidente_id_tenant"),
@@ -44,64 +39,94 @@ TENANT_SCOPED_TABLES = [
 ]
 
 
+def _has_table(bind, name: str) -> bool:
+    return sa.inspect(bind).has_table(name)
+
+
+def _has_column(bind, table: str, col: str) -> bool:
+    cols = {c["name"] for c in sa.inspect(bind).get_columns(table)}
+    return col in cols
+
+
+def _has_index(bind, index_name: str) -> bool:
+    return bind.execute(
+        sa.text("SELECT 1 FROM pg_indexes WHERE indexname = :n"),
+        {"n": index_name},
+    ).scalar() is not None
+
+
+def _has_constraint(bind, constraint_name: str) -> bool:
+    return bind.execute(
+        sa.text("SELECT 1 FROM pg_constraint WHERE conname = :n"),
+        {"n": constraint_name},
+    ).scalar() is not None
+
+
 def upgrade() -> None:
-    # ---------- 1. Tablas nuevas ----------
-    op.create_table(
-        "plan",
-        sa.Column("id_plan", sa.Integer(), primary_key=True),
-        sa.Column("codigo", sa.String(length=50), nullable=False, unique=True),
-        sa.Column("nombre", sa.String(length=100), nullable=False),
-        sa.Column("descripcion", sa.String(length=500), nullable=True),
-        sa.Column("precio_mensual", sa.Numeric(10, 2), nullable=False, server_default="0"),
-        sa.Column("moneda", sa.String(length=3), nullable=False, server_default="USD"),
-        sa.Column("max_talleres", sa.Integer(), nullable=False, server_default="1"),
-        sa.Column("max_tecnicos", sa.Integer(), nullable=False, server_default="5"),
-        sa.Column("max_incidentes_mes", sa.Integer(), nullable=True),
-        sa.Column("feature_websockets", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("feature_kpis_avanzados", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("feature_reportes_ia", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("activo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-    )
+    bind = op.get_bind()
 
-    op.create_table(
-        "tenant",
-        sa.Column("id_tenant", sa.Integer(), primary_key=True),
-        sa.Column("slug", sa.String(length=50), nullable=False, unique=True),
-        sa.Column("nombre", sa.String(length=150), nullable=False),
-        sa.Column("email_contacto", sa.String(length=100), nullable=False),
-        sa.Column("telefono", sa.String(length=20), nullable=True),
-        sa.Column("activo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("suspendido", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-    )
-    op.create_index("ix_tenant_slug", "tenant", ["slug"], unique=True)
+    # ---------- 1. Tablas nuevas (idempotente) ----------
+    if not _has_table(bind, "plan"):
+        op.create_table(
+            "plan",
+            sa.Column("id_plan", sa.Integer(), primary_key=True),
+            sa.Column("codigo", sa.String(length=50), nullable=False, unique=True),
+            sa.Column("nombre", sa.String(length=100), nullable=False),
+            sa.Column("descripcion", sa.String(length=500), nullable=True),
+            sa.Column("precio_mensual", sa.Numeric(10, 2), nullable=False, server_default="0"),
+            sa.Column("moneda", sa.String(length=3), nullable=False, server_default="USD"),
+            sa.Column("max_talleres", sa.Integer(), nullable=False, server_default="1"),
+            sa.Column("max_tecnicos", sa.Integer(), nullable=False, server_default="5"),
+            sa.Column("max_incidentes_mes", sa.Integer(), nullable=True),
+            sa.Column("feature_websockets", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column("feature_kpis_avanzados", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column("feature_reportes_ia", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column("activo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        )
 
-    op.create_table(
-        "suscripcion",
-        sa.Column("id_suscripcion", sa.Integer(), primary_key=True),
-        sa.Column("id_tenant", sa.Integer(), sa.ForeignKey("tenant.id_tenant"), nullable=False, index=True),
-        sa.Column("id_plan", sa.Integer(), sa.ForeignKey("plan.id_plan"), nullable=False),
-        sa.Column("estado", sa.String(length=30), nullable=False, server_default="trial"),
-        sa.Column("stripe_customer_id", sa.String(length=100), nullable=True),
-        sa.Column("stripe_subscription_id", sa.String(length=100), nullable=True),
-        sa.Column("inicio", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("fin", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-    )
+    if not _has_table(bind, "tenant"):
+        op.create_table(
+            "tenant",
+            sa.Column("id_tenant", sa.Integer(), primary_key=True),
+            sa.Column("slug", sa.String(length=50), nullable=False, unique=True),
+            sa.Column("nombre", sa.String(length=150), nullable=False),
+            sa.Column("email_contacto", sa.String(length=100), nullable=False),
+            sa.Column("telefono", sa.String(length=20), nullable=True),
+            sa.Column("activo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+            sa.Column("suspendido", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        )
+    if not _has_index(bind, "ix_tenant_slug"):
+        op.create_index("ix_tenant_slug", "tenant", ["slug"], unique=True)
 
-    op.create_table(
-        "tenant_user",
-        sa.Column("id_tenant_user", sa.Integer(), primary_key=True),
-        sa.Column("id_tenant", sa.Integer(), sa.ForeignKey("tenant.id_tenant"), nullable=False, index=True),
-        sa.Column("id_usuario", sa.Integer(), sa.ForeignKey("usuario.id_usuario"), nullable=False, index=True),
-        sa.Column("rol_tenant", sa.String(length=30), nullable=False, server_default="operador"),
-        sa.Column("activo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.UniqueConstraint("id_tenant", "id_usuario", name="uq_tenant_user"),
-    )
+    if not _has_table(bind, "suscripcion"):
+        op.create_table(
+            "suscripcion",
+            sa.Column("id_suscripcion", sa.Integer(), primary_key=True),
+            sa.Column("id_tenant", sa.Integer(), sa.ForeignKey("tenant.id_tenant"), nullable=False, index=True),
+            sa.Column("id_plan", sa.Integer(), sa.ForeignKey("plan.id_plan"), nullable=False),
+            sa.Column("estado", sa.String(length=30), nullable=False, server_default="trial"),
+            sa.Column("stripe_customer_id", sa.String(length=100), nullable=True),
+            sa.Column("stripe_subscription_id", sa.String(length=100), nullable=True),
+            sa.Column("inicio", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+            sa.Column("fin", sa.DateTime(timezone=True), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+            sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        )
+
+    if not _has_table(bind, "tenant_user"):
+        op.create_table(
+            "tenant_user",
+            sa.Column("id_tenant_user", sa.Integer(), primary_key=True),
+            sa.Column("id_tenant", sa.Integer(), sa.ForeignKey("tenant.id_tenant"), nullable=False, index=True),
+            sa.Column("id_usuario", sa.Integer(), sa.ForeignKey("usuario.id_usuario"), nullable=False, index=True),
+            sa.Column("rol_tenant", sa.String(length=30), nullable=False, server_default="operador"),
+            sa.Column("activo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+            sa.UniqueConstraint("id_tenant", "id_usuario", name="uq_tenant_user"),
+        )
 
     # ---------- 2. Seed de planes por defecto ----------
     op.execute(
@@ -114,25 +139,27 @@ def upgrade() -> None:
         VALUES
           ('free',       'Free',       'Plan gratuito para evaluacion',          0,  'USD', 1,  3,  100,  false, false, false, true),
           ('pro',        'Pro',        'Para talleres en crecimiento',          49,  'USD', 3,  15, 2000, true,  true,  false, true),
-          ('enterprise', 'Enterprise', 'Multi-sucursal, IA y soporte premium', 199,  'USD', 99, 99, NULL, true,  true,  true,  true);
+          ('enterprise', 'Enterprise', 'Multi-sucursal, IA y soporte premium', 199,  'USD', 99, 99, NULL, true,  true,  true,  true)
+        ON CONFLICT (codigo) DO NOTHING;
         """
     )
 
-    # ---------- 3. id_tenant en tablas existentes ----------
+    # ---------- 3. id_tenant en tablas existentes (idempotente) ----------
     for table, fk_name, idx_name in TENANT_SCOPED_TABLES:
-        op.add_column(table, sa.Column("id_tenant", sa.Integer(), nullable=True))
-        op.create_index(idx_name, table, ["id_tenant"])
-        op.create_foreign_key(fk_name, table, "tenant", ["id_tenant"], ["id_tenant"])
+        if not _has_column(bind, table, "id_tenant"):
+            op.add_column(table, sa.Column("id_tenant", sa.Integer(), nullable=True))
+        if not _has_index(bind, idx_name):
+            op.create_index(idx_name, table, ["id_tenant"])
+        if not _has_constraint(bind, fk_name):
+            op.create_foreign_key(fk_name, table, "tenant", ["id_tenant"], ["id_tenant"])
 
 
 def downgrade() -> None:
-    # Quitar id_tenant de tablas scoped
     for table, fk_name, idx_name in TENANT_SCOPED_TABLES:
         op.drop_constraint(fk_name, table, type_="foreignkey")
         op.drop_index(idx_name, table_name=table)
         op.drop_column(table, "id_tenant")
 
-    # Tablas nuevas
     op.drop_table("tenant_user")
     op.drop_table("suscripcion")
     op.drop_index("ix_tenant_slug", table_name="tenant")

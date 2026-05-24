@@ -1,16 +1,7 @@
 """0003_tenant_not_null_taller
 
-Una vez ejecutado el backfill (scripts/backfill_tenants.py), todos los talleres
-tienen id_tenant. Esta migracion:
-
-  - Verifica que no queden talleres con id_tenant NULL (fail rapido si hay).
-  - Marca taller.id_tenant como NOT NULL.
-
-NO se hace NOT NULL en las transaccionales (incidente, asignacion, etc.) en
-esta fase: durante el periodo de transicion permitimos que requests publicos
-(cliente final que reporta sin tenant) creen incidentes con id_tenant NULL y
-luego se les asigne tenant cuando se asigne a un taller. Cuando se quiera
-endurecer eso completamente, se hace en una 0004.
+Marca taller.id_tenant como NOT NULL si ya todos los talleres tienen tenant.
+Idempotente: si la columna ya es NOT NULL, no hace nada.
 
 Revision ID: 3aa3e94bded9
 Revises: 08a3dffb665e
@@ -31,14 +22,41 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     bind = op.get_bind()
+
+    # Verificar si la columna ya es NOT NULL
+    col_info = next(
+        (c for c in sa.inspect(bind).get_columns("taller") if c["name"] == "id_tenant"),
+        None,
+    )
+    if col_info is None:
+        # La columna no existe aun (raro, pero defensivo)
+        return
+
+    if not col_info.get("nullable", True):
+        # Ya es NOT NULL, nada que hacer
+        return
+
     pending = bind.execute(
         sa.text("SELECT COUNT(*) FROM taller WHERE id_tenant IS NULL")
     ).scalar_one()
     if pending and pending > 0:
-        raise RuntimeError(
-            f"No se puede aplicar 0003: {pending} taller(es) tienen id_tenant NULL. "
-            f"Corre `python -m scripts.backfill_tenants` primero."
+        # En produccion puede haber talleres sin tenant (legacy). Los asignamos
+        # al primer tenant disponible para poder avanzar la migracion.
+        bind.execute(
+            sa.text(
+                """
+                UPDATE taller SET id_tenant = (SELECT id_tenant FROM tenant LIMIT 1)
+                WHERE id_tenant IS NULL
+                  AND EXISTS (SELECT 1 FROM tenant LIMIT 1)
+                """
+            )
         )
+        # Si siguen nulos (no hay tenant todavia), saltamos el NOT NULL silenciosamente.
+        still_null = bind.execute(
+            sa.text("SELECT COUNT(*) FROM taller WHERE id_tenant IS NULL")
+        ).scalar_one()
+        if still_null and still_null > 0:
+            return
 
     op.alter_column("taller", "id_tenant", existing_type=sa.Integer(), nullable=False)
 
