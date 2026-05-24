@@ -181,10 +181,12 @@ async def _stop_realtime() -> None:
 
 if __name__ == "__main__":
     import uvicorn
+    # Puerto local por defecto = 8001 (el 8000 lo usa otro programa del usuario).
+    # En Render, $PORT lo inyecta la plataforma — no afecta produccion.
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=int(os.getenv("PORT", "8000")),
+        port=int(os.getenv("PORT", "8001")),
         reload=settings.DEBUG,
         log_level="info"
     )

@@ -10,6 +10,12 @@
 # de un estado conocido. Pon SEED_ON_STARTUP=false cuando quieras congelar.
 set -e
 
+# IMPORTANTE: aplicar migraciones SIEMPRE antes de arrancar.
+# Sin esto, los modelos con columnas nuevas (idempotency_key, monto_preautorizacion,
+# stripe_preauth_id, tabla adenda, etc.) fallan en runtime contra una BD vieja.
+echo "==> [start.sh] Aplicando migraciones Alembic"
+alembic upgrade head
+
 if [ "${SEED_ON_STARTUP:-true}" = "true" ]; then
     echo "==> [start.sh] SEED_ON_STARTUP=true → corriendo SETT/run_all.py"
     python -m SETT.run_all
