@@ -386,6 +386,36 @@ async def reportar_ubicacion(
 # ============ EVIDENCIAS ============
 
 @router.get(
+    "/mis-asignaciones/{id_asignacion}",
+    response_model=TecnicoAsignacionResponse,
+    summary="Detalle de una asignacion especifica del tecnico",
+)
+def detalle_asignacion(
+    id_asignacion: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    if current_user.id_rol != 3:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo tecnicos pueden usar este endpoint",
+        )
+
+    asignacion = db.query(Asignacion).filter(
+        Asignacion.id_asignacion == id_asignacion,
+        Asignacion.id_usuario == current_user.id_usuario,
+    ).first()
+
+    if not asignacion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asignacion no encontrada o no asignada a ti",
+        )
+
+    return asignacion
+
+
+@router.get(
     "/mis-asignaciones/{id_asignacion}/evidencias",
     response_model=List[EvidenciaMiniT],
     summary="Ver evidencias del incidente",
@@ -519,12 +549,13 @@ def completar_asignacion(
         )
 
     estado_actual = db.get(EstadoAsignacion, asignacion.id_estado_asignacion)
-    if not estado_actual or estado_actual.nombre != "en_camino":
+    estados_permitidos = {"en_camino", "llegado"}
+    if not estado_actual or estado_actual.nombre not in estados_permitidos:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 f"La asignación está en '{estado_actual.nombre if estado_actual else '?'}', "
-                f"solo se puede completar desde 'en_camino'"
+                f"solo se puede completar desde 'en_camino' o 'llegado'"
             ),
         )
 
