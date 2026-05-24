@@ -8,11 +8,14 @@ from sqlalchemy.orm import Session
 from app.models.catalogos import EstadoAsignacion, EstadoPago, MetodoPago
 from app.models.incidente import Asignacion, HistorialEstadoAsignacion
 from app.models.taller import Taller
+from app.models.tenant import Tenant
 from app.models.transaccional import Pago
 from app.models.usuario import Usuario
 
 
-COMPENSACION_POR_ESTADO = {
+# Fallback usado solo si el tenant no esta cargado. Los porcentajes reales
+# vienen de Tenant.pct_cancel_* y son configurables por el admin.
+COMPENSACION_DEFAULT = {
     "pendiente": Decimal("0.00"),
     "aceptada": Decimal("0.50"),
     "en_camino": Decimal("1.00"),
@@ -20,6 +23,26 @@ COMPENSACION_POR_ESTADO = {
 }
 
 ESTADOS_NO_CANCELABLES = {"completada", "cancelada"}
+
+
+def _factor_compensacion(tenant: Tenant | None, estado: str) -> Decimal | None:
+    """Lee el porcentaje configurado en el tenant y lo convierte a factor.
+    'llegado' usa el mismo porcentaje que 'en_camino'.
+    """
+    if estado not in COMPENSACION_DEFAULT:
+        return None
+    if tenant is None:
+        return COMPENSACION_DEFAULT[estado]
+    pct_map = {
+        "pendiente": tenant.pct_cancel_pendiente,
+        "aceptada": tenant.pct_cancel_aceptada,
+        "en_camino": tenant.pct_cancel_en_camino,
+        "llegado": tenant.pct_cancel_en_camino,
+    }
+    pct = pct_map.get(estado)
+    if pct is None:
+        return COMPENSACION_DEFAULT[estado]
+    return (Decimal(str(pct)) / Decimal("100")).quantize(Decimal("0.01"))
 
 
 def cancelar_asignacion(
@@ -35,11 +58,13 @@ def cancelar_asignacion(
     if estado_actual in ESTADOS_NO_CANCELABLES:
         raise HTTPException(409, f"No se puede cancelar una asignacion '{estado_actual}'")
 
-    factor = COMPENSACION_POR_ESTADO.get(estado_actual)
+    taller: Taller = asignacion.taller
+    # El tenant configura los porcentajes desde admin
+    tenant = db.query(Tenant).filter_by(id_tenant=asignacion.id_tenant).first()
+    factor = _factor_compensacion(tenant, estado_actual)
     if factor is None:
         raise HTTPException(500, f"Estado '{estado_actual}' sin regla de compensacion")
 
-    taller: Taller = asignacion.taller
     tarifa = Decimal(str(taller.tarifa_traslado or 0))
     compensacion = (tarifa * factor).quantize(Decimal("0.01"))
 

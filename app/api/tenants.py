@@ -33,6 +33,7 @@ from app.schemas.tenant_schema import (
     TallerLinkRequest,
     TallerLinkResponse,
     TenantCreate,
+    TenantCancelacionPctUpdate,
     TenantResponse,
     TenantUpdate,
 )
@@ -231,6 +232,42 @@ def actualizar_tenant(
 
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(tenant, field, value)
+    db.commit()
+    db.refresh(tenant)
+    return tenant
+
+
+@router.get(
+    "/tenants/me",
+    response_model=TenantResponse,
+    summary="Detalle de mi tenant (incluye porcentajes de cancelacion)",
+)
+def obtener_mi_tenant(
+    db: Session = Depends(get_db),
+    current_taller: Taller = Depends(get_current_taller),
+):
+    return _get_tenant_or_404(db, current_taller.id_tenant)
+
+
+@router.patch(
+    "/tenants/me/cancelacion-pct",
+    response_model=TenantResponse,
+    summary="Configurar porcentajes de compensacion por cancelacion",
+    description=(
+        "Admin del tenant ajusta los porcentajes que se cobran sobre "
+        "taller.tarifa_traslado segun el estado de la asignacion al cancelar. "
+        "Default: pendiente=0%, aceptada=50%, en_camino=100%."
+    ),
+)
+def actualizar_cancelacion_pct(
+    body: TenantCancelacionPctUpdate,
+    db: Session = Depends(get_db),
+    current_taller: Taller = Depends(get_current_taller),
+):
+    tenant = _get_tenant_or_404(db, current_taller.id_tenant)
+    tenant.pct_cancel_pendiente = body.pct_cancel_pendiente
+    tenant.pct_cancel_aceptada = body.pct_cancel_aceptada
+    tenant.pct_cancel_en_camino = body.pct_cancel_en_camino
     db.commit()
     db.refresh(tenant)
     return tenant

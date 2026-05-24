@@ -217,6 +217,7 @@ def actualizar_servicios(
             id_categoria=s.id_categoria,
             servicio_movil=s.servicio_movil,
             tarifa_base=s.tarifa_base,
+            tiempo_estimado_min=s.tiempo_estimado_min,
         )
         for s in body.servicios
     ]
@@ -256,6 +257,11 @@ def talleres_compatibles(
         .all()
     )
 
+    # Misma constante que tracking_service usa para estimar ETA del tecnico en
+    # vivo: asi el ETA inicial mostrado al elegir taller coincide con el que
+    # vera mientras el tecnico viene en camino.
+    from app.services.tracking_service import VELOCIDAD_DEFAULT_KMH
+
     resultado = []
     for taller, servicio in candidatos:
         d = _haversine_km(latitud, longitud, taller.latitud, taller.longitud)
@@ -263,7 +269,18 @@ def talleres_compatibles(
             continue
         item = TallerCompatibleResponse.model_validate(taller)
         item.distancia_km = round(d, 2)
-        item.tarifa_base = float(servicio.tarifa_base) if servicio.tarifa_base else None
+        tarifa_base = float(servicio.tarifa_base) if servicio.tarifa_base else None
+        item.tarifa_base = tarifa_base
+        # Desglose visible al cliente: traslado = tarifa_por_km * distancia
+        tarifa_km = float(taller.tarifa_traslado or 0)
+        traslado = round(tarifa_km * d, 2)
+        item.monto_traslado = traslado if tarifa_km > 0 else None
+        if tarifa_base is not None:
+            item.total_estimado = round(tarifa_base + traslado, 2)
+        # Tiempo de reparacion: lo configura el taller en /servicios.
+        item.tiempo_reparacion_min = servicio.tiempo_estimado_min
+        # ETA de llegada del tecnico: distancia / velocidad_promedio.
+        item.eta_llegada_min = max(1, int(round((d / VELOCIDAD_DEFAULT_KMH) * 60)))
         resultado.append(item)
 
     resultado.sort(key=lambda x: x.distancia_km or 9999)

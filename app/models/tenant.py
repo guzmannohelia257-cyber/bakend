@@ -69,6 +69,13 @@ class Tenant(Base):
     activo = Column(Boolean, default=True, nullable=False)
     suspendido = Column(Boolean, default=False, nullable=False)  # billing/abuse
 
+    # Porcentajes de compensacion por cancelacion, configurables por tenant.
+    # Se aplican sobre taller.tarifa_traslado para calcular el monto que recibe
+    # el taller cuando el cliente cancela en cada estado.
+    pct_cancel_pendiente = Column(Integer, default=0, nullable=False, server_default="0")
+    pct_cancel_aceptada = Column(Integer, default=50, nullable=False, server_default="50")
+    pct_cancel_en_camino = Column(Integer, default=100, nullable=False, server_default="100")
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

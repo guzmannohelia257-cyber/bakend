@@ -331,6 +331,7 @@ class TallerServicioCreate(BaseModel):
     id_categoria: int = Field(..., gt=0)
     servicio_movil: bool = False
     tarifa_base: Optional[float] = Field(None, ge=0)
+    tiempo_estimado_min: Optional[int] = Field(None, ge=0, le=60 * 24)
 
 
 class TallerServicioResponse(BaseModel):
@@ -341,6 +342,7 @@ class TallerServicioResponse(BaseModel):
     id_categoria: int
     servicio_movil: bool
     tarifa_base: Optional[float] = None
+    tiempo_estimado_min: Optional[int] = None
 
 
 class TallerConServicios(TallerResponse):
@@ -356,7 +358,11 @@ class ActualizarServiciosTallerRequest(BaseModel):
 
 
 class TallerCompatibleResponse(TallerResponse):
-    """Taller candidato para un incidente, incluye distancia."""
+    """Taller candidato para un incidente, incluye distancia y desglose."""
     distancia_km: Optional[float] = None
     tarifa_base: Optional[float] = None
+    monto_traslado: Optional[float] = None  # tarifa_traslado_taller * distancia_km
+    total_estimado: Optional[float] = None  # tarifa_base + monto_traslado
+    tiempo_reparacion_min: Optional[int] = None  # TallerServicio.tiempo_estimado_min
+    eta_llegada_min: Optional[int] = None  # distancia_km / VELOCIDAD_DEFAULT_KMH * 60
     rating_promedio: Optional[float] = None

@@ -43,6 +43,13 @@ class TenantUpdate(BaseModel):
     telefono: Optional[str] = Field(None, max_length=20)
 
 
+class TenantCancelacionPctUpdate(BaseModel):
+    """Porcentajes de compensacion por cancelacion (admin del tenant)."""
+    pct_cancel_pendiente: int = Field(..., ge=0, le=100)
+    pct_cancel_aceptada: int = Field(..., ge=0, le=100)
+    pct_cancel_en_camino: int = Field(..., ge=0, le=100)
+
+
 class TenantResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -53,6 +60,9 @@ class TenantResponse(BaseModel):
     telefono: Optional[str] = None
     activo: bool
     suspendido: bool
+    pct_cancel_pendiente: int = 0
+    pct_cancel_aceptada: int = 50
+    pct_cancel_en_camino: int = 100
     created_at: datetime
     updated_at: datetime
 

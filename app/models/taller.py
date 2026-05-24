@@ -56,6 +56,8 @@ class TallerServicio(Base):
     id_categoria = Column(Integer, ForeignKey("categoria_problema.id_categoria"), nullable=False)
     servicio_movil = Column(Boolean, default=False, nullable=False)
     tarifa_base = Column(Numeric(10, 2), nullable=True)
+    # Tiempo estimado de reparacion en minutos (referencial, lo configura el taller)
+    tiempo_estimado_min = Column(Integer, nullable=True)
 
     taller = relationship("Taller", back_populates="servicios")
     categoria = relationship("CategoriaProblema")
