@@ -116,6 +116,7 @@ def responder_cotizacion(
     monto_repuestos: float,
     garantia_dias: int | None,
     nota: str | None,
+    tiempo_estimado_min: int | None = None,
 ) -> Cotizacion:
     if cotizacion.id_taller != taller.id_taller:
         raise HTTPException(403, "Esta cotizacion no te pertenece")
@@ -130,6 +131,7 @@ def responder_cotizacion(
     cotizacion.monto_servicio = monto_servicio
     cotizacion.monto_repuestos = monto_repuestos
     cotizacion.garantia_dias = garantia_dias
+    cotizacion.tiempo_estimado_min = tiempo_estimado_min
     cotizacion.nota = nota
     cotizacion.id_estado_cotizacion = _get_estado(db, "enviada").id_estado_cotizacion
     db.commit()
@@ -178,6 +180,7 @@ def aceptar_cotizacion(
         id_taller=cotizacion.id_taller,
         id_estado_asignacion=estado_asig_aceptada.id_estado_asignacion,
         costo_estimado=cotizacion.monto_total,
+        tiempo_estimado_reparacion_min=cotizacion.tiempo_estimado_min,
         nota_taller=cotizacion.nota,
     )
     db.add(asig)

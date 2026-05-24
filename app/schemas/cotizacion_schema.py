@@ -16,6 +16,10 @@ class ResponderCotizacionRequest(BaseModel):
     monto_servicio: float = Field(..., ge=0)
     monto_repuestos: float = Field(0, ge=0)
     garantia_dias: Optional[int] = Field(None, ge=0, le=365)
+    tiempo_estimado_min: Optional[int] = Field(
+        None, ge=0, le=60 * 24 * 30,
+        description="Tiempo estimado de reparacion en minutos",
+    )
     nota: Optional[str] = Field(None, max_length=1000)
 
 
@@ -44,6 +48,7 @@ class CotizacionResponse(BaseModel):
     monto_servicio: Optional[float] = None
     monto_repuestos: Optional[float] = None
     garantia_dias: Optional[int] = None
+    tiempo_estimado_min: Optional[int] = None
     nota: Optional[str] = None
     validez_hasta: Optional[datetime] = None
     created_at: datetime

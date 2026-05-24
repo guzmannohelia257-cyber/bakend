@@ -16,6 +16,7 @@ from app.api.catalogos import router as catalogos_router
 from app.api.cotizaciones import router as cotizaciones_router
 from app.api.asignaciones import router as asignaciones_router
 from app.api.kpis import router as kpis_router
+from app.api.adendas import router as adendas_router
 
 __all__ = [
     "users_router",
@@ -33,4 +34,5 @@ __all__ = [
     "cotizaciones_router",
     "asignaciones_router",
     "kpis_router",
+    "adendas_router",
 ]

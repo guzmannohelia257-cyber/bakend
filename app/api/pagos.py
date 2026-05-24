@@ -11,6 +11,7 @@ from typing import Optional, List
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request, Header, status
+from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,7 @@ from app.schemas.transaccional_schema import (
     ConfirmarPagoAppRequest,
 )
 from app.core.security import get_current_user
+from app.services import pago_service
 
 router = APIRouter(
     prefix="/pagos",
@@ -393,6 +395,79 @@ def listar_mis_pagos(
         )
 
     return resultado
+
+
+@router.post(
+    "/preautorizar/{id_incidente}",
+    summary="Pre-autorizar pago: reserva el monto estimado (capture_method=manual)",
+    description=(
+        "Estima un costo referencial a partir de la categoria IA + tarifa promedio "
+        "de talleres. Crea un PaymentIntent en modo manual_capture: NO cobra "
+        "todavia, solo reserva el monto en la tarjeta del cliente. Si el cliente "
+        "no tiene fondos, no se buscara taller."
+    ),
+)
+def preautorizar_endpoint(
+    id_incidente: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    if current_user.id_rol != 1:
+        raise HTTPException(403, "Solo clientes pueden pre-autorizar pagos")
+
+    incidente = db.get(Incidente, id_incidente)
+    if not incidente:
+        raise HTTPException(404, "Incidente no encontrado")
+    if incidente.id_usuario != current_user.id_usuario:
+        raise HTTPException(403, "Este incidente no te pertenece")
+
+    monto = pago_service.estimar_costo(db, incidente)
+    return pago_service.preautorizar(db, incidente, monto)
+
+
+class CapturarRequest(BaseModel):
+    monto_final: Optional[float] = None
+
+
+@router.post(
+    "/capturar/{id_incidente}",
+    summary="Capturar pago al finalizar el servicio (cobro real)",
+    description=(
+        "Toma el PaymentIntent pre-autorizado y lo captura con el monto final. "
+        "Si monto_final es null, captura el monto pre-autorizado completo."
+    ),
+)
+def capturar_endpoint(
+    id_incidente: int,
+    body: CapturarRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    if current_user.id_rol not in (1, 3, 4):  # cliente, tecnico o admin
+        raise HTTPException(403, "Rol sin permiso para capturar pagos")
+
+    incidente = db.get(Incidente, id_incidente)
+    if not incidente:
+        raise HTTPException(404, "Incidente no encontrado")
+
+    if current_user.id_rol == 1 and incidente.id_usuario != current_user.id_usuario:
+        raise HTTPException(403, "Este incidente no te pertenece")
+
+    from decimal import Decimal as _Dec
+
+    monto_final = None
+    if body and body.monto_final is not None:
+        monto_final = _Dec(str(body.monto_final))
+
+    pago = pago_service.capturar(db, incidente, monto_final=monto_final)
+    return {
+        "id_pago": pago.id_pago,
+        "tipo": pago.tipo,
+        "monto_total": float(pago.monto_total),
+        "comision_plataforma": float(pago.comision_plataforma),
+        "monto_taller": float(pago.monto_taller),
+        "referencia_externa": pago.referencia_externa,
+    }
 
 
 @router.get(

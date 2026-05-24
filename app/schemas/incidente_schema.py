@@ -21,6 +21,16 @@ class IncidenteCreate(BaseModel):
     descripcion_usuario: str = Field(..., description="Descripción del problema reportado por el usuario")
     latitud: float = Field(..., description="Latitud GPS del incidente")
     longitud: float = Field(..., description="Longitud GPS del incidente")
+    idempotency_key: Optional[str] = Field(
+        None,
+        min_length=8,
+        max_length=64,
+        description=(
+            "UUID/clave generada por el cliente para deduplicar reintentos "
+            "(modo offline). Si ya existe un incidente del usuario con esta clave, "
+            "se retorna el existente sin crear uno nuevo."
+        ),
+    )
 
 
 # ==========================================
@@ -122,6 +132,7 @@ class AsignacionResponse(BaseModel):
     id_tecnico: Optional[int] = None
     id_estado_asignacion: int
     eta_minutos: Optional[int] = None
+    tiempo_estimado_reparacion_min: Optional[int] = None
     nota_taller: Optional[str] = None
     created_at: datetime
     updated_at: datetime

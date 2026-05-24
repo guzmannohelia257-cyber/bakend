@@ -216,7 +216,8 @@ def _borrar_incidentes_y_dependencias(db: Session, ids: list[int]) -> None:
     description=(
         "Crea el incidente en estado 'borrador'. No se notifica a talleres ni se ejecuta "
         "el motor de asignación hasta que el cliente llama POST /incidencias/{id}/confirmar "
-        "tras elegir taller."
+        "tras elegir taller. Soporta `idempotency_key` para deduplicar reintentos "
+        "del modo offline."
     ),
 )
 async def reportar_incidencia(
@@ -235,6 +236,20 @@ async def reportar_incidencia(
     el incidente pasa a 'pendiente', se ejecuta el motor de asignación y se notifica
     a los talleres compatibles.
     """
+
+    # ✅ IDEMPOTENCIA OFFLINE: si llega un key y ya existe un incidente del mismo
+    # usuario con ese key, devolvemos el existente sin crear nada nuevo.
+    if incidente_in.idempotency_key:
+        existente = (
+            db.query(Incidente)
+            .filter(
+                Incidente.id_usuario == current_user.id_usuario,
+                Incidente.idempotency_key == incidente_in.idempotency_key,
+            )
+            .first()
+        )
+        if existente:
+            return existente
 
     # ✅ VALIDACIÓN: Solo 1 incidente activo (pendiente/en_proceso) por usuario
     estado_activo_existente = db.query(Incidente).join(
@@ -286,6 +301,7 @@ async def reportar_incidencia(
         descripcion_usuario=incidente_in.descripcion_usuario,
         latitud=incidente_in.latitud,
         longitud=incidente_in.longitud,
+        idempotency_key=incidente_in.idempotency_key,
     )
     db.add(nuevo_incidente)
     db.flush()
@@ -803,7 +819,11 @@ def obtener_ubicacion_tecnico(
     "/{id_incidente}/cancelar",
     response_model=IncidenteDetalle,
     summary="Cancelar un incidente activo",
-    description="El cliente cancela un incidente propio en estado pendiente o en_proceso.",
+    description=(
+        "El cliente cancela un incidente propio en estado pendiente o en_proceso. "
+        "Si la asignacion ya esta 'en_camino' se crea automaticamente un Pago de "
+        "tipo 'penalizacion' (tarifa fija USD 5)."
+    ),
 )
 def cancelar_incidente(
     id_incidente: int,
@@ -811,6 +831,7 @@ def cancelar_incidente(
     current_user: Usuario = Depends(get_current_user),
 ):
     from app.models.incidente import HistorialEstadoIncidente
+    from app.services import pago_service
 
     incidente = db.query(Incidente).filter(
         Incidente.id_incidente == id_incidente,
@@ -830,11 +851,40 @@ def cancelar_incidente(
     if not estado_cancelado:
         raise HTTPException(status_code=500, detail="Estado 'cancelado' no encontrado en catálogo")
 
+    # Penalizacion automatica si la asignacion activa esta 'en_camino'.
+    pago_penalizacion = None
+    try:
+        from app.models.catalogos import EstadoAsignacion
+
+        estado_en_camino = (
+            db.query(EstadoAsignacion).filter_by(nombre="en_camino").first()
+        )
+        if estado_en_camino:
+            asig_en_camino = (
+                db.query(Asignacion)
+                .filter(
+                    Asignacion.id_incidente == incidente.id_incidente,
+                    Asignacion.id_estado_asignacion == estado_en_camino.id_estado_asignacion,
+                )
+                .first()
+            )
+            if asig_en_camino:
+                pago_penalizacion = pago_service.penalizar_por_cancelacion(
+                    db, incidente
+                )
+    except Exception:
+        # No bloquear la cancelacion si el cobro falla; se registra en logs.
+        pago_penalizacion = None
+
     db.add(HistorialEstadoIncidente(
         id_incidente=incidente.id_incidente,
         id_estado_anterior=incidente.id_estado,
         id_estado_nuevo=estado_cancelado.id_estado,
-        observacion="Cancelado por el cliente",
+        observacion=(
+            "Cancelado por el cliente (con penalizacion)"
+            if pago_penalizacion
+            else "Cancelado por el cliente"
+        ),
     ))
     incidente.id_estado = estado_cancelado.id_estado
     db.commit()

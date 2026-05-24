@@ -1,7 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(./venv/Scripts/python.exe -c ' *)"
+      "Bash(./venv/Scripts/python.exe -c ' *)",
+      "Bash(python -c ' *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Isael Ortiz\\\\Documents\\\\yary\\\\Backend\" -Recurse -Depth 2)",
+      "Bash(Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Isael Ortiz\\\\Documents\\\\yary\\\\Backend\" -Recurse -Depth 3 | Where-Object { $_.PSIsContainer } | Select-Object FullName)",
+      "Bash(python -m alembic current)",
+      "Bash(python -m alembic heads)",
+      "Bash(python -m alembic upgrade head)",
+      "Bash(python -m pytest tests/test_kpis_extendidos.py tests/test_tiempo_estimado.py tests/test_idempotencia_incidentes.py -x -q)",
+      "Bash(python -m pytest -q)",
+      "Bash(python -m pytest tests/test_adendas.py -x -q)",
+      "Bash(python -c \"from app.main import app; print\\('OK', len\\(app.routes\\), 'routes'\\)\")",
+      "Bash(python -m pytest tests/test_pagos_extendidos.py -x -q)",
+      "Bash(grep -iE \"\\(start|run|.bat|.ps1|.sh\\)$\")"
     ]
   }
 }

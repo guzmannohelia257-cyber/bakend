@@ -26,7 +26,7 @@ from app.models.incidente import (
     Evaluacion,
 )
 from app.models.cotizacion import Cotizacion, EstadoCotizacion
-from app.models.transaccional import Notificacion, Pago, Metrica, Mensaje
+from app.models.transaccional import Adenda, Notificacion, Pago, Metrica, Mensaje
 from app.models.ubicacion import UbicacionTecnico
 
 __all__ = [
@@ -62,6 +62,7 @@ __all__ = [
     "Cotizacion",
     "EstadoCotizacion",
     # Transaccional
+    "Adenda",
     "Notificacion",
     "Pago",
     "Metrica",

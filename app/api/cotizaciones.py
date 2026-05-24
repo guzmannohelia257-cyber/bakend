@@ -142,5 +142,6 @@ def responder(
         monto_servicio=body.monto_servicio,
         monto_repuestos=body.monto_repuestos,
         garantia_dias=body.garantia_dias,
+        tiempo_estimado_min=body.tiempo_estimado_min,
         nota=body.nota,
     )

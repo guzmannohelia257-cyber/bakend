@@ -39,6 +39,7 @@ class Cotizacion(Base):
     monto_servicio = Column(Numeric(10, 2), nullable=True)
     monto_repuestos = Column(Numeric(10, 2), nullable=True, default=0)
     garantia_dias = Column(Integer, nullable=True)
+    tiempo_estimado_min = Column(Integer, nullable=True)
     nota = Column(Text, nullable=True)
     validez_hasta = Column(DateTime(timezone=True), nullable=True)
 

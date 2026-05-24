@@ -6,10 +6,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import Integer, cast, func, select
+from sqlalchemy import Integer, cast, desc, func, select
 from sqlalchemy.orm import Session
 
-from app.models.catalogos import CategoriaProblema, EstadoAsignacion
+from app.models.catalogos import CategoriaProblema, EstadoAsignacion, EstadoIncidente
 from app.models.incidente import (
     Asignacion,
     Evaluacion,
@@ -18,6 +18,9 @@ from app.models.incidente import (
     CandidatoAsignacion,
 )
 from app.models.taller import Taller
+
+
+SLA_MINUTOS_DEFAULT = 60
 
 
 def _rango_default():
@@ -221,6 +224,141 @@ def ranking_talleres(db: Session, desde: datetime, hasta: datetime, limite: int 
     return resultado[:limite]
 
 
+def incidentes_cancelados(
+    db: Session,
+    desde: datetime,
+    hasta: datetime,
+    id_tenant: Optional[int] = None,
+) -> int:
+    """
+    Cantidad de incidentes con estado 'cancelado' creados en el rango.
+    """
+    estado_cancelado = db.query(EstadoIncidente).filter_by(nombre="cancelado").first()
+    if not estado_cancelado:
+        return 0
+
+    q = (
+        select(func.count(Incidente.id_incidente))
+        .where(Incidente.id_estado == estado_cancelado.id_estado)
+        .where(Incidente.created_at.between(desde, hasta))
+    )
+    if id_tenant is not None:
+        q = q.where(Incidente.id_tenant == id_tenant)
+
+    val = db.execute(q).scalar()
+    return int(val or 0)
+
+
+def zonas_mas_incidentes(
+    db: Session,
+    desde: datetime,
+    hasta: datetime,
+    id_tenant: Optional[int] = None,
+    limite: int = 10,
+    precision_decimales: int = 2,
+) -> list[dict]:
+    """
+    Agrupa incidentes por zona geografica aproximada (redondeo de lat/lng).
+    Default 2 decimales = celdas de ~1 km^2.
+    """
+    lat_round = func.round(cast(Incidente.latitud, sa_numeric()), precision_decimales)
+    lng_round = func.round(cast(Incidente.longitud, sa_numeric()), precision_decimales)
+
+    q = (
+        select(
+            lat_round.label("lat"),
+            lng_round.label("lng"),
+            func.count(Incidente.id_incidente).label("total"),
+        )
+        .where(Incidente.created_at.between(desde, hasta))
+        .group_by("lat", "lng")
+        .order_by(desc("total"))
+        .limit(limite)
+    )
+    if id_tenant is not None:
+        q = q.where(Incidente.id_tenant == id_tenant)
+
+    return [
+        {"lat": float(r.lat), "lng": float(r.lng), "total": int(r.total)}
+        for r in db.execute(q).all()
+    ]
+
+
+def cumplimiento_sla(
+    db: Session,
+    desde: datetime,
+    hasta: datetime,
+    id_tenant: Optional[int] = None,
+    sla_minutos: int = SLA_MINUTOS_DEFAULT,
+) -> dict:
+    """
+    Porcentaje de asignaciones completadas dentro del umbral SLA
+    (tiempo desde creacion del incidente hasta marca 'completada' en historial).
+    Retorna {'total_completadas': int, 'cumplen_sla': int, 'porcentaje': float, 'sla_minutos': int}.
+    """
+    estado_completada = db.query(EstadoAsignacion).filter_by(nombre="completada").first()
+    if not estado_completada:
+        return {
+            "total_completadas": 0,
+            "cumplen_sla": 0,
+            "porcentaje": 0.0,
+            "sla_minutos": sla_minutos,
+        }
+
+    sub_completada = (
+        select(
+            HistorialEstadoAsignacion.id_asignacion.label("aid"),
+            func.min(HistorialEstadoAsignacion.created_at).label("ts_fin"),
+        )
+        .where(
+            HistorialEstadoAsignacion.id_estado_nuevo
+            == estado_completada.id_estado_asignacion
+        )
+        .group_by(HistorialEstadoAsignacion.id_asignacion)
+        .subquery()
+    )
+
+    base = (
+        select(
+            Asignacion.id_asignacion,
+            (
+                func.extract("epoch", sub_completada.c.ts_fin - Incidente.created_at) / 60
+            ).label("duracion_min"),
+        )
+        .select_from(Asignacion)
+        .join(sub_completada, sub_completada.c.aid == Asignacion.id_asignacion)
+        .join(Incidente, Incidente.id_incidente == Asignacion.id_incidente)
+        .where(sub_completada.c.ts_fin.between(desde, hasta))
+    )
+    if id_tenant is not None:
+        base = base.where(Asignacion.id_tenant == id_tenant)
+
+    base_sub = base.subquery()
+    total = db.execute(
+        select(func.count()).select_from(base_sub)
+    ).scalar() or 0
+    cumplen = db.execute(
+        select(func.count())
+        .select_from(base_sub)
+        .where(base_sub.c.duracion_min <= sla_minutos)
+    ).scalar() or 0
+
+    porcentaje = (float(cumplen) / float(total) * 100.0) if total else 0.0
+    return {
+        "total_completadas": int(total),
+        "cumplen_sla": int(cumplen),
+        "porcentaje": round(porcentaje, 2),
+        "sla_minutos": sla_minutos,
+    }
+
+
+def sa_numeric():
+    """Lazy import para no romper si SQLAlchemy types se reorganizan."""
+    from sqlalchemy import Numeric
+
+    return Numeric(10, 6)
+
+
 def resumen_completo(
     db: Session,
     desde: Optional[datetime] = None,
@@ -239,4 +377,7 @@ def resumen_completo(
             tiempo_promedio_llegada_min(db, desde, hasta, id_tenant), 2
         ),
         "incidentes_por_categoria": incidentes_por_categoria(db, desde, hasta, id_tenant),
+        "casos_cancelados": incidentes_cancelados(db, desde, hasta, id_tenant),
+        "zonas_mas_incidentes": zonas_mas_incidentes(db, desde, hasta, id_tenant),
+        "sla_cumplimiento": cumplimiento_sla(db, desde, hasta, id_tenant),
     }

@@ -37,6 +37,12 @@ class Notificacion(Base):
 
 class Pago(Base):
     __tablename__ = "pago"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('servicio','penalizacion','preauth')",
+            name="chk_pago_tipo",
+        ),
+    )
 
     id_pago = Column(Integer, primary_key=True, index=True)
     id_tenant = Column(Integer, ForeignKey("tenant.id_tenant"), nullable=True, index=True)
@@ -44,6 +50,7 @@ class Pago(Base):
     id_metodo_pago = Column(Integer, ForeignKey("metodo_pago.id_metodo_pago"), nullable=False)
     id_estado_pago = Column(Integer, ForeignKey("estado_pago.id_estado_pago"), nullable=False)
 
+    tipo = Column(String(20), nullable=False, default="servicio")
     monto_total = Column(Numeric(10, 2), nullable=False)
     comision_plataforma = Column(Numeric(10, 2), nullable=False)
     monto_taller = Column(Numeric(10, 2), nullable=False)
@@ -77,6 +84,37 @@ class Metrica(Base):
     comentario_cliente = Column(Text, nullable=True)
 
     incidente = relationship("Incidente")
+
+
+class Adenda(Base):
+    """
+    Adenda / demasia: ampliacion de presupuesto cuando el tecnico encuentra
+    danos ocultos durante el servicio. La asignacion se congela en
+    'en_espera_aprobacion' hasta que el cliente aprueba o rechaza.
+    """
+    __tablename__ = "adenda"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('pendiente','aprobada','rechazada')",
+            name="chk_adenda_estado",
+        ),
+    )
+
+    id_adenda = Column(Integer, primary_key=True, index=True)
+    id_tenant = Column(Integer, ForeignKey("tenant.id_tenant"), nullable=True, index=True)
+    id_asignacion = Column(Integer, ForeignKey("asignacion.id_asignacion"), nullable=False, index=True)
+    id_tecnico = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=True)
+
+    monto_adicional = Column(Numeric(10, 2), nullable=False)
+    descripcion = Column(Text, nullable=False)
+    estado = Column(String(20), nullable=False, default="pendiente")
+    motivo_cliente = Column(Text, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    respondida_at = Column(DateTime(timezone=True), nullable=True)
+
+    asignacion = relationship("Asignacion")
+    tecnico = relationship("Usuario")
 
 
 class Mensaje(Base):

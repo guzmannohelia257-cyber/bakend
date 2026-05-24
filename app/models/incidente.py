@@ -1,7 +1,18 @@
 """
 Núcleo transaccional: incidentes, asignaciones, evidencias e historiales.
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, Text, Numeric
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Float,
+    Text,
+    Numeric,
+    UniqueConstraint,
+)
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.session import Base
@@ -9,6 +20,11 @@ from app.db.session import Base
 
 class Incidente(Base):
     __tablename__ = "incidente"
+    __table_args__ = (
+        UniqueConstraint(
+            "id_usuario", "idempotency_key", name="uq_incidente_usuario_idemkey"
+        ),
+    )
 
     id_incidente = Column(Integer, primary_key=True, index=True)
     id_tenant = Column(Integer, ForeignKey("tenant.id_tenant"), nullable=True, index=True)
@@ -25,6 +41,9 @@ class Incidente(Base):
     resumen_ia = Column(Text, nullable=True)
     clasificacion_ia_confianza = Column(Float, nullable=True)
     requiere_revision_manual = Column(Boolean, default=False, nullable=False)
+    idempotency_key = Column(String(64), nullable=True, index=True)
+    monto_preautorizacion = Column(Numeric(10, 2), nullable=True)
+    stripe_preauth_id = Column(String(100), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -52,6 +71,7 @@ class Asignacion(Base):
     id_estado_asignacion = Column(Integer, ForeignKey("estado_asignacion.id_estado_asignacion"), nullable=False)
 
     eta_minutos = Column(Integer, nullable=True)
+    tiempo_estimado_reparacion_min = Column(Integer, nullable=True)
     costo_estimado = Column(Numeric(10, 2), nullable=True)
     nota_taller = Column(Text, nullable=True)
 
