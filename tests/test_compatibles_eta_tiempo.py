@@ -93,3 +93,68 @@ def test_taller_guarda_tiempo_estimado_via_put_servicios(
         .first()
     )
     assert persistido.tiempo_estimado_min == 90
+
+
+def test_tarifa_y_tiempo_son_independientes_entre_talleres(
+    client,
+    db_session,
+    tenant_factory,
+    taller_factory,
+    taller_auth_headers,
+):
+    """Dos talleres distintos para la MISMA categoria deben poder tener
+    tarifa_base y tiempo_estimado_min completamente diferentes."""
+    from app.models.catalogos import CategoriaProblema
+    from app.models.taller import TallerServicio
+
+    cat = db_session.query(CategoriaProblema).filter_by(codigo="llantas").one()
+
+    tenant_a = tenant_factory()
+    tenant_b = tenant_factory()
+    taller_a = taller_factory(tenant_a)
+    taller_b = taller_factory(tenant_b)
+
+    # Taller A: tarifa 50, 30 min
+    client.put(
+        "/talleres/mi-taller/servicios",
+        json={"servicios": [{
+            "id_categoria": cat.id_categoria,
+            "servicio_movil": True,
+            "tarifa_base": 50,
+            "tiempo_estimado_min": 30,
+        }]},
+        headers=taller_auth_headers(taller_a),
+    )
+
+    # Taller B: tarifa 120, 90 min
+    client.put(
+        "/talleres/mi-taller/servicios",
+        json={"servicios": [{
+            "id_categoria": cat.id_categoria,
+            "servicio_movil": True,
+            "tarifa_base": 120,
+            "tiempo_estimado_min": 90,
+        }]},
+        headers=taller_auth_headers(taller_b),
+    )
+
+    # Cada taller persiste lo suyo, sin pisarse
+    sa = db_session.query(TallerServicio).filter_by(
+        id_taller=taller_a.id_taller, id_categoria=cat.id_categoria,
+    ).first()
+    sb = db_session.query(TallerServicio).filter_by(
+        id_taller=taller_b.id_taller, id_categoria=cat.id_categoria,
+    ).first()
+
+    assert float(sa.tarifa_base) == 50.0
+    assert sa.tiempo_estimado_min == 30
+    assert float(sb.tarifa_base) == 120.0
+    assert sb.tiempo_estimado_min == 90
+
+    # Y cada uno solo ve sus propios servicios via GET
+    ra = client.get("/talleres/mi-taller/servicios", headers=taller_auth_headers(taller_a))
+    assert ra.status_code == 200
+    listadosA = ra.json()
+    assert len(listadosA) == 1
+    assert listadosA[0]["tarifa_base"] == 50.0
+    assert listadosA[0]["tiempo_estimado_min"] == 30
