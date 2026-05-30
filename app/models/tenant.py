@@ -40,12 +40,12 @@ class Plan(Base):
     precio_mensual = Column(Numeric(10, 2), nullable=False, default=0)
     moneda = Column(String(3), nullable=False, default="USD")
 
-    # Limites del plan
+    # Límites del plan
     max_talleres = Column(Integer, nullable=False, default=1)
     max_tecnicos = Column(Integer, nullable=False, default=5)
     max_incidentes_mes = Column(Integer, nullable=True)  # None = ilimitado
 
-    # Feature flags simples (extender segun se necesite)
+    # Feature flags simples (extender según se necesite)
     feature_websockets = Column(Boolean, default=False, nullable=False)
     feature_kpis_avanzados = Column(Boolean, default=False, nullable=False)
     feature_reportes_ia = Column(Boolean, default=False, nullable=False)
@@ -69,7 +69,7 @@ class Tenant(Base):
     activo = Column(Boolean, default=True, nullable=False)
     suspendido = Column(Boolean, default=False, nullable=False)  # billing/abuse
 
-    # Porcentajes de compensacion por cancelacion, configurables por tenant.
+    # Porcentajes de compensación por cancelación, configurables por tenant.
     # Se aplican sobre taller.tarifa_traslado para calcular el monto que recibe
     # el taller cuando el cliente cancela en cada estado.
     pct_cancel_pendiente = Column(Integer, default=0, nullable=False, server_default="0")

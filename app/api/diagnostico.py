@@ -52,8 +52,7 @@ def diagnostico_token(authorization: str = Header(None)):
         }
     
     token = parts[1]
-    
-    # Intentar verificar el token
+
     payload = verify_token(token)
     
     if payload is None:

@@ -7,9 +7,7 @@ from typing import Optional
 from datetime import datetime
 
 
-# ==========================================
-# SCHEMAS PARA REGISTRO (POST /usuarios/registro)
-# ==========================================
+# Esquemas para registro (POST /usuarios/registro)
 
 class UsuarioCreate(BaseModel):
     """
@@ -38,9 +36,7 @@ class UsuarioCreate(BaseModel):
         }
 
 
-# ==========================================
-# SCHEMAS PARA RESPUESTAS (HTTP 200)
-# ==========================================
+# Esquemas para respuestas (HTTP 200)
 
 class UsuarioResponse(BaseModel):
     """
@@ -56,7 +52,7 @@ class UsuarioResponse(BaseModel):
     created_at: datetime = Field(..., description="Fecha de creación")
     
     class Config:
-        from_attributes = True  # Permite leer desde objetos SQLAlchemy
+        from_attributes = True  # Permite leer desde objetos SQLAlchemy.
         json_schema_extra = {
             "example": {
                 "id_usuario": 1,
@@ -88,9 +84,7 @@ class UsuarioDetailResponse(UsuarioResponse):
     rol: RolResponse = Field(..., description="Información del rol del usuario")
 
 
-# ==========================================
-# SCHEMAS PARA LOGIN (POST /usuarios/login)
-# ==========================================
+# Esquemas para login (POST /usuarios/login)
 
 class LoginRequest(BaseModel):
     """
@@ -117,9 +111,7 @@ class TokenResponse(BaseModel):
     usuario: UsuarioResponse = Field(..., description="Datos del usuario autenticado")
 
 
-# ==========================================
-# SCHEMAS PARA EDICIÓN
-# ==========================================
+# Esquemas para edición
 
 class UsuarioUpdate(BaseModel):
     """
@@ -140,9 +132,7 @@ class UsuarioUpdate(BaseModel):
         }
 
 
-# ==========================================
-# SCHEMAS PARA RESPUESTAS DE OPERACIONES
-# ==========================================
+# Esquemas para respuestas de operaciones
 
 class MensajeResponse(BaseModel):
     """

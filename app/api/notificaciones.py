@@ -25,7 +25,7 @@ router = APIRouter(
 )
 
 
-# ── USUARIOS ──────────────────────────────────────────────────────────────────
+# Usuarios
 
 @router.post(
     "/push-token",
@@ -77,7 +77,7 @@ def marcar_leida_usuario(
     db.commit()
 
 
-# ── TALLER ────────────────────────────────────────────────────────────────────
+# Taller
 
 @router.post(
     "/taller/push-token",

@@ -50,7 +50,7 @@ def _verificar_incidente_taller(db: Session, id_incidente: int, id_taller: int) 
     return db.get(Incidente, id_incidente)
 
 
-# ── LISTAR ────────────────────────────────────────────────────────────────────
+# Listar
 
 @router.get(
     "/{id_incidente}",
@@ -98,7 +98,7 @@ def listar_mensajes_taller(
     return mensajes
 
 
-# ── ENVIAR ────────────────────────────────────────────────────────────────────
+# Enviar
 
 @router.post(
     "/{id_incidente}",

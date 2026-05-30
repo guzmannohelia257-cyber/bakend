@@ -76,7 +76,7 @@ def registrar_usuario(
     ```
     """
     
-    # 1️⃣ Verificar si el correo ya existe
+    # Verificar si el correo ya existe
     usuario_existente = db.query(Usuario).filter(
         Usuario.email == user_data.email
     ).first()
@@ -87,11 +87,10 @@ def registrar_usuario(
             detail="El email ya está registrado en el sistema"
         )
     
-    # 2️⃣ Hashear la contraseña con bcrypt
+    # Hashear la contraseña con bcrypt
     password_hasheada = hash_password(user_data.password)
-    
-    # 3️⃣ Crear nuevo usuario
-    # id_rol = 1 por defecto (cliente)
+
+    # Crear el nuevo usuario con el rol de cliente por defecto
     nuevo_usuario = Usuario(
         id_rol=1,  # Cliente por defecto
         nombre=user_data.nombre,
@@ -101,7 +100,7 @@ def registrar_usuario(
         activo=True
     )
     
-    # 4️⃣ Guardar en la Base de Datos
+    # Guardar en la base de datos
     db.add(nuevo_usuario)
     db.commit()
     db.refresh(nuevo_usuario)
@@ -149,7 +148,7 @@ def login(
     ```
     """
     
-    # 1️⃣ Buscar el usuario por email
+    # Buscar el usuario por email
     usuario = db.query(Usuario).filter(
         Usuario.email == credenciales.email
     ).first()
@@ -160,27 +159,27 @@ def login(
             detail="Email o contraseña incorrectos"
         )
 
-    # 2️⃣ Verificar la contraseña
+    # Verificar la contraseña
     if not verify_password(credenciales.password, usuario.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos"
         )
 
-    # 3️⃣ Rechazar si la cuenta está desactivada
+    # Rechazar si la cuenta está desactivada
     if not usuario.activo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tu cuenta ha sido desactivada"
         )
 
-    # 4️⃣ Crear JWT token (sub = id_usuario, tipo = "usuario")
+    # Crear el JWT (sub = id_usuario, tipo = "usuario")
     access_token = create_access_token(
         subject_id=usuario.id_usuario,
         tipo="usuario",
     )
 
-    # 5️⃣ Retornar token y datos del usuario
+    # Retornar el token y los datos del usuario
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -261,9 +260,9 @@ def editar_mi_perfil(
     Retorna los datos actualizados del usuario
     """
     
-    # ✅ El usuario ya está verificado por get_current_user
-    # ✅ No necesitamos verificar el ID en la URL (está en el token)
-    
+    # El usuario ya está verificado por get_current_user; su ID se obtiene del
+    # token, por lo que no es necesario validarlo desde la URL.
+
     # Actualizar solo los campos que se envían
     if user_update.nombre is not None:
         current_user.nombre = user_update.nombre
@@ -274,8 +273,7 @@ def editar_mi_perfil(
     if user_update.password is not None:
         # Hashear la nueva contraseña con Argon2
         current_user.password_hash = hash_password(user_update.password)
-    
-    # Guardar cambios
+
     db.commit()
     db.refresh(current_user)
     
@@ -313,9 +311,9 @@ def dar_de_baja_mi_cuenta(
     ```
     """
     
-    # ✅ El usuario ya está verificado y activo por get_current_user
-    
-    # BAJA LÓGICA: Cambiar activo a False en lugar de DELETE
+    # El usuario ya está verificado y activo por get_current_user.
+
+    # Baja lógica: marcar activo como False en lugar de eliminar el registro
     current_user.activo = False
     
     db.commit()

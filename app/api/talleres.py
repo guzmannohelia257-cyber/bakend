@@ -70,7 +70,7 @@ router = APIRouter(
 )
 
 
-# ============ AUTENTICACIÓN DEL TALLER ============
+# Autenticación del taller
 
 @router.post(
     "/login",
@@ -93,8 +93,9 @@ def login_taller(credenciales: TallerLoginRequest, db: Session = Depends(get_db)
         )
 
     # Multi-tenant (Fase 1): incluir id_tenant en el JWT para que el middleware
-    # pueda setear el contexto. Es None mientras el taller no haya sido vinculado
-    # a un tenant -> el filtro global lo trata como request publico.
+    # pueda establecer el contexto. Es None mientras el taller no haya sido
+    # vinculado a un tenant, en cuyo caso el filtro global lo trata como
+    # request público.
     extra: dict = {}
     if taller.id_tenant is not None:
         extra["id_tenant"] = taller.id_tenant
@@ -107,7 +108,7 @@ def login_taller(credenciales: TallerLoginRequest, db: Session = Depends(get_db)
     return {"access_token": access_token, "token_type": "bearer", "taller": taller}
 
 
-# ============ INFO DEL TALLER ============
+# Información del taller
 
 @router.get("/mi-taller", response_model=TallerResponse, summary="Obtener mi taller")
 def obtener_mi_taller(current_taller: Taller = Depends(get_current_taller)):
@@ -257,9 +258,9 @@ def talleres_compatibles(
         .all()
     )
 
-    # Misma constante que tracking_service usa para estimar ETA del tecnico en
-    # vivo: asi el ETA inicial mostrado al elegir taller coincide con el que
-    # vera mientras el tecnico viene en camino.
+    # Misma constante que tracking_service usa para estimar el ETA del técnico
+    # en vivo: así el ETA inicial mostrado al elegir taller coincide con el que
+    # verá mientras el técnico viene en camino.
     from app.services.tracking_service import VELOCIDAD_DEFAULT_KMH
 
     resultado = []
@@ -271,15 +272,15 @@ def talleres_compatibles(
         item.distancia_km = round(d, 2)
         tarifa_base = float(servicio.tarifa_base) if servicio.tarifa_base else None
         item.tarifa_base = tarifa_base
-        # Desglose visible al cliente: traslado = tarifa_por_km * distancia
+        # Desglose visible al cliente: traslado = tarifa_por_km * distancia.
         tarifa_km = float(taller.tarifa_traslado or 0)
         traslado = round(tarifa_km * d, 2)
         item.monto_traslado = traslado if tarifa_km > 0 else None
         if tarifa_base is not None:
             item.total_estimado = round(tarifa_base + traslado, 2)
-        # Tiempo de reparacion: lo configura el taller en /servicios.
+        # Tiempo de reparación: lo configura el taller en /servicios.
         item.tiempo_reparacion_min = servicio.tiempo_estimado_min
-        # ETA de llegada del tecnico: distancia / velocidad_promedio.
+        # ETA de llegada del técnico: distancia / velocidad_promedio.
         item.eta_llegada_min = max(1, int(round((d / VELOCIDAD_DEFAULT_KMH) * 60)))
         resultado.append(item)
 
@@ -287,7 +288,7 @@ def talleres_compatibles(
     return resultado[:10]
 
 
-# ============ TÉCNICOS (Gestión de Técnicos del Taller) ============
+# Técnicos (gestión de técnicos del taller)
 
 @router.get(
     "/mi-taller/tecnicos",
@@ -385,7 +386,7 @@ def crear_tecnico(
 ):
     from app.models.usuario_taller import UsuarioTaller
     
-    # 1. Validar que el email no existe
+    # 1. Validar que el email no exista
     usuario_existe = db.query(Usuario).filter(Usuario.email == tecnico_data.email).first()
     if usuario_existe:
         raise HTTPException(
@@ -395,7 +396,7 @@ def crear_tecnico(
     
     # 2. Crear usuario técnico (rol=3)
     nuevo_usuario = Usuario(
-        id_rol=3,  # Rol técnico
+        id_rol=3,  # Rol técnico.
         nombre=tecnico_data.nombre,
         email=tecnico_data.email,
         telefono=tecnico_data.telefono,
@@ -403,7 +404,7 @@ def crear_tecnico(
         activo=True,
     )
     db.add(nuevo_usuario)
-    db.flush()  # Obtener el ID sin hacer commit
+    db.flush()  # Obtener el ID sin hacer commit.
     
     # 3. Vincular usuario a taller con UsuarioTaller
     usuario_taller = UsuarioTaller(
@@ -484,7 +485,7 @@ def remover_tecnico(
     return MensajeResponse(mensaje="Técnico removido del taller correctamente")
 
 
-# ============ ASIGNACIONES (el taller responde al cliente) ============
+# Asignaciones (el taller responde al cliente)
 
 def _get_asignacion_del_taller(db: Session, id_taller: int, id_asignacion: int) -> Asignacion:
     asignacion = db.query(Asignacion).filter(
@@ -517,11 +518,9 @@ def listar_asignaciones(
     # Evitar solicitudes de incidentes cancelados en cualquier estado
     q = q.join(Incidente).join(EstadoIncidente).filter(EstadoIncidente.nombre != "cancelado")
     
-    # Filtrar por estado
     if estado:
         q = q.join(EstadoAsignacion).filter(EstadoAsignacion.nombre == estado)
-    
-    # Filtrar por rango de fechas
+
     if desde:
         from datetime import datetime
         q = q.filter(Asignacion.created_at >= datetime.combine(desde, datetime.min.time()))
@@ -567,7 +566,7 @@ def aceptar_asignacion(
         )
 
     if payload.id_usuario is not None:
-        # Validar que el usuario existe y es técnico (rol=3)
+        # Validar que el usuario exista y sea técnico (rol=3).
         tecnico_user = db.query(Usuario).filter(
             Usuario.id_usuario == payload.id_usuario,
             Usuario.id_rol == 3,
@@ -579,7 +578,7 @@ def aceptar_asignacion(
                 detail="Usuario técnico no encontrado o no está activo",
             )
 
-        # Validar que ese técnico pertenezca a este taller
+        # Validar que ese técnico pertenezca a este taller.
         from app.models.usuario_taller import UsuarioTaller
         relacion_tecnico = db.query(UsuarioTaller).filter(
             UsuarioTaller.id_usuario == payload.id_usuario,
@@ -592,7 +591,7 @@ def aceptar_asignacion(
                 detail="El técnico no pertenece a tu taller o está inactivo",
             )
         
-        # 🔴 VALIDACIÓN CRÍTICA: Un técnico NO puede tener más de una asignación activa a la vez
+        # Validación crítica: un técnico no puede tener más de una asignación activa a la vez.
         asignacion_activa_existente = db.query(Asignacion).filter(
             Asignacion.id_usuario == payload.id_usuario,
             Asignacion.id_estado_asignacion.in_(
@@ -600,7 +599,7 @@ def aceptar_asignacion(
                     EstadoAsignacion.nombre.in_(["aceptada", "en_camino"])
                 )
             ),
-            Asignacion.id_asignacion != id_asignacion  # Excluir la asignación actual
+            Asignacion.id_asignacion != id_asignacion  # Excluir la asignación actual.
         ).first()
         
         if asignacion_activa_existente:
@@ -616,7 +615,7 @@ def aceptar_asignacion(
     if payload.nota:
         asignacion.nota_taller = payload.nota
 
-    # A.1: usar trazabilidad para registrar el cambio de estado
+    # A.1: usar trazabilidad para registrar el cambio de estado.
     observacion = f"Aceptada por taller {current_taller.id_taller}"
     if payload.eta_minutos is not None:
         observacion += f". ETA: {payload.eta_minutos} min"
@@ -628,7 +627,7 @@ def aceptar_asignacion(
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Notificaciones: cliente y técnico asignado
+    # Notificaciones: cliente y técnico asignado.
     incidente = db.get(Incidente, asignacion.id_incidente)
     if incidente and incidente.id_usuario:
         cliente = db.get(Usuario, incidente.id_usuario)
@@ -706,42 +705,42 @@ def rechazar_asignacion(
     asignacion.id_estado_asignacion = estado_rechazada.id_estado_asignacion
     asignacion.nota_taller = payload.motivo
     
-    # Registrar cambio de estado en historial
+    # Registrar el cambio de estado en el historial.
     registrar_cambio_estado_asignacion(
         db, asignacion, id_estado_anterior, estado_rechazada.id_estado_asignacion,
         observacion=f"Rechazada por taller {current_taller.id_taller}. Motivo: {payload.motivo}"
     )
 
-    # Desmarcar al taller como candidato seleccionado para que el cliente pueda elegir otro
+    # Desmarcar al taller como candidato seleccionado para que el cliente pueda elegir otro.
     db.query(CandidatoAsignacion).filter(
         CandidatoAsignacion.id_incidente == asignacion.id_incidente,
         CandidatoAsignacion.id_taller == current_taller.id_taller,
     ).update({CandidatoAsignacion.seleccionado: False}, synchronize_session=False)
 
-    # B.1: Reasignación automática — buscar siguiente candidato
+    # B.1: reasignación automática — buscar el siguiente candidato.
     incidente = db.get(Incidente, asignacion.id_incidente)
     if incidente:
-        # Obtener lista de talleres que ya rechazaron este incidente
+        # Obtener la lista de talleres que ya rechazaron este incidente.
         rechazos_previos = db.query(Asignacion.id_taller).join(EstadoAsignacion).filter(
             Asignacion.id_incidente == incidente.id_incidente,
             EstadoAsignacion.nombre == "rechazada",
         ).all()
         ids_rechazantes = {r[0] for r in rechazos_previos}
         
-        # Buscar el siguiente candidato con mejor score (excluyendo rechazantes)
+        # Buscar el siguiente candidato con mejor score (excluyendo a los que ya rechazaron).
         siguiente = db.query(CandidatoAsignacion).filter(
             CandidatoAsignacion.id_incidente == incidente.id_incidente,
             ~CandidatoAsignacion.id_taller.in_(ids_rechazantes or [-1]),
         ).order_by(CandidatoAsignacion.score_total.desc()).first()
         
         if siguiente:
-            # Marcar nuevo candidato como seleccionado
+            # Marcar el nuevo candidato como seleccionado.
             siguiente.seleccionado = True
 
-            # Crear nueva asignación para el siguiente candidato.
-            # Importante: hay que setear el id_tenant del taller destino, sino
-            # las queries multi-tenant del nuevo taller no encuentran la
-            # asignación y queda invisible en su dashboard.
+            # Crear la nueva asignación para el siguiente candidato.
+            # Importante: hay que establecer el id_tenant del taller destino; de
+            # lo contrario, las consultas multi-tenant del nuevo taller no
+            # encuentran la asignación y queda invisible en su dashboard.
             # Resolvemos el tenant del destino vía SQL plano (sin scoping por
             # tenant), ya que el candidato puede pertenecer a otro tenant.
             estado_pendiente = db.query(EstadoAsignacion).filter_by(nombre="pendiente").first()
@@ -762,7 +761,7 @@ def rechazar_asignacion(
                 db.add(nueva_asignacion)
                 db.flush()
                 
-                # Registrar creación de nueva asignación en historial.
+                # Registrar la creación de la nueva asignación en el historial.
                 # score_total puede ser None si el matching no lo calculó.
                 score_txt = (
                     f"{siguiente.score_total:.2f}"
@@ -777,9 +776,9 @@ def rechazar_asignacion(
                         f"Nuevo taller: {siguiente.id_taller} (score: {score_txt})"
                     ),
                 )
-                # TODO CU-32: enviar push notification al nuevo taller
+                # TODO CU-32: enviar notificación push al nuevo taller.
         else:
-            # No hay más candidatos — dejar para reasignación manual o cancelar
+            # No hay más candidatos: dejar para reasignación manual o cancelar.
             import logging
             logger = logging.getLogger("talleres")
             logger.warning(
@@ -791,7 +790,7 @@ def rechazar_asignacion(
     return asignacion
 
 
-# ============ A.3 — CU-10: EVALUACIONES DEL TALLER ============
+# A.3 — CU-10: evaluaciones del taller
 
 @router.get(
     "/mi-taller/evaluaciones",
@@ -811,7 +810,7 @@ def mis_evaluaciones(
     )
 
 
-# ============ HISTORIAL DE ATENCIONES ============
+# Historial de atenciones
 
 @router.get(
     "/mi-taller/historial",
@@ -849,7 +848,7 @@ def historial_atenciones(
     return items
 
 
-# ============ GESTIÓN DE SERVICIOS DEL TALLER ============
+# Gestión de servicios del taller
 
 class CategoriaResponse(BaseModel):
     id_categoria: int
@@ -925,12 +924,12 @@ def actualizar_mis_servicios(
     db: Session = Depends(get_db),
     current_taller: Taller = Depends(get_current_taller),
 ):
-    # Borrar servicios actuales
+    # Borrar los servicios actuales.
     db.query(TallerServicio).filter(
         TallerServicio.id_taller == current_taller.id_taller
     ).delete(synchronize_session=False)
 
-    # Insertar nuevos (solo IDs válidos)
+    # Insertar los nuevos (solo IDs válidos).
     nuevos = []
     for id_cat in payload.categorias:
         cat = db.get(CategoriaProblema, id_cat)

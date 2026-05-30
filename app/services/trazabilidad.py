@@ -160,7 +160,7 @@ def cambiar_estado_incidente(
     return nuevo
 
 
-# ── Helpers de notificación ───────────────────────────────────────────────────
+# Helpers de notificación
 
 def _notificar_cliente_por_asignacion(
     db: Session,

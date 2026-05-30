@@ -29,12 +29,12 @@ class Settings(BaseSettings):
     # Dejar en False en cualquier entorno que no sea un sandbox aislado.
     AUTO_CREATE_TABLES: bool = False
 
-    # CORS: lista separada por coma de origenes permitidos.
-    # Vacio + DEBUG=True -> se permite "*" (modo dev legacy).
+    # CORS: lista separada por coma de orígenes permitidos.
+    # Vacío + DEBUG=True -> se permite "*" (modo dev legacy).
     CORS_ORIGINS: str = ""
 
     # Multi-tenant (Fase 1)
-    # False = endpoints siguen funcionando sin tenant (transicion).
+    # False = endpoints siguen funcionando sin tenant (transición).
     # True  = todo endpoint protegido requiere id_tenant en JWT.
     TENANT_ENFORCEMENT: bool = False
 

@@ -48,11 +48,11 @@ def install_tenant_filter(include_legacy: bool = True) -> None:
             return
 
         tid = current_tenant.get()
-        # None = sin scope (request publico). 0 = super-admin (sin filtro).
+        # None = sin scope (request público). 0 = super-admin (sin filtro).
         if tid is None or tid == 0:
             return
 
-        # Importacion diferida para evitar ciclos
+        # Importación diferida para evitar ciclos de importación
         from app.db.session import Base
 
         for mapper in Base.registry.mappers:

@@ -19,7 +19,7 @@ from contextvars import ContextVar
 from typing import Optional
 
 
-# None = request publico / sin tenant (cliente final reportando incidente, etc.)
+# None = request público / sin tenant (cliente final reportando incidente, etc.)
 current_tenant: ContextVar[Optional[int]] = ContextVar("current_tenant", default=None)
 
 

@@ -43,9 +43,7 @@ from app.core.rate_limit import limiter
 router = APIRouter(tags=["Tenants"])
 
 
-# ============================================================
-# HELPERS
-# ============================================================
+# Helpers
 
 def _require_super_admin(current_user=Depends(get_current_user)):
     """Solo usuarios con rol=4 (admin global)."""
@@ -58,7 +56,7 @@ def _require_super_admin(current_user=Depends(get_current_user)):
 
 
 def _get_tenant_or_404(db: Session, id_tenant: int) -> Tenant:
-    # bypass del filtro global: super-admin ve cualquier tenant
+    # Se omite el filtro global de tenant para que el super-admin pueda ver cualquier tenant.
     tok = current_tenant.set(0)
     try:
         tenant = db.query(Tenant).filter(Tenant.id_tenant == id_tenant).first()
@@ -69,18 +67,14 @@ def _get_tenant_or_404(db: Session, id_tenant: int) -> Tenant:
     return tenant
 
 
-# ============================================================
-# PLANES (publico)
-# ============================================================
+# Planes (público)
 
 @router.get("/plans", response_model=List[PlanResponse], summary="Listar planes disponibles")
 def listar_planes(db: Session = Depends(get_db)):
     return db.query(Plan).filter(Plan.activo == True).order_by(Plan.precio_mensual).all()  # noqa: E712
 
 
-# ============================================================
-# SIGNUP SELF-SERVICE (publico)
-# ============================================================
+# Signup self-service (público)
 
 @router.post(
     "/signup",
@@ -90,18 +84,18 @@ def listar_planes(db: Session = Depends(get_db)):
 )
 @limiter.limit("5/minute")
 def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db)):
-    # 1) plan
+    # 1) Validar el plan solicitado.
     plan = db.query(Plan).filter(Plan.codigo == body.plan_codigo, Plan.activo == True).first()  # noqa: E712
     if plan is None:
         raise HTTPException(status_code=400, detail=f"Plan '{body.plan_codigo}' no existe o esta inactivo")
 
-    # 2) unicidad de slug y email
+    # 2) Verificar la unicidad del slug y del email.
     if db.query(Tenant).filter(Tenant.slug == body.tenant_slug).first():
         raise HTTPException(status_code=409, detail="Ese slug de tenant ya esta tomado")
     if db.query(Taller).filter(Taller.email == body.taller_email).first():
         raise HTTPException(status_code=409, detail="Ya existe un taller con ese email")
 
-    # 3) crear tenant
+    # 3) Crear el tenant.
     tenant = Tenant(
         slug=body.tenant_slug,
         nombre=body.tenant_nombre,
@@ -111,10 +105,10 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     db.add(tenant)
     db.flush()
 
-    # 4) suscripcion al plan
+    # 4) Crear la suscripción al plan.
     db.add(Suscripcion(id_tenant=tenant.id_tenant, id_plan=plan.id_plan, estado="trial"))
 
-    # 5) crear taller asociado al tenant
+    # 5) Crear el taller asociado al tenant.
     taller = Taller(
         id_tenant=tenant.id_tenant,
         nombre=body.taller_nombre,
@@ -130,7 +124,7 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     db.refresh(tenant)
     db.refresh(taller)
 
-    # 6) emitir token con id_tenant
+    # 6) Emitir el token incluyendo el id_tenant.
     access_token = create_access_token(
         subject_id=taller.id_taller,
         tipo="taller",
@@ -145,9 +139,7 @@ def signup(request: Request, body: SignupRequest, db: Session = Depends(get_db))
     )
 
 
-# ============================================================
-# TENANT - CRUD (admin)
-# ============================================================
+# Tenant - CRUD (admin)
 
 @router.get("/tenants", response_model=List[TenantResponse], summary="Listar todos los tenants (super-admin)")
 def listar_tenants(
@@ -213,7 +205,7 @@ def detalle_tenant(
     db: Session = Depends(get_db),
     current_taller: Taller = Depends(get_current_taller),
 ):
-    # Solo super-admin o miembro del tenant. Aqui simplificamos: solo si es su tenant.
+    # Solo super-admin o miembro del tenant. Aquí simplificamos: solo si es su propio tenant.
     if current_taller.id_tenant != id_tenant:
         raise HTTPException(status_code=403, detail="Solo puedes ver tu propio tenant")
     return _get_tenant_or_404(db, id_tenant)
@@ -286,7 +278,7 @@ def vincular_taller(
 ):
     tenant = _get_tenant_or_404(db, id_tenant)
 
-    # bypass filtro para localizar el taller aunque pertenezca a otro tenant
+    # Se omite el filtro para localizar el taller aunque pertenezca a otro tenant.
     tok = current_tenant.set(0)
     try:
         taller = db.query(Taller).filter(Taller.id_taller == body.id_taller).first()
@@ -310,9 +302,7 @@ def vincular_taller(
     )
 
 
-# ============================================================
-# SUSCRIPCION
-# ============================================================
+# Suscripción
 
 @router.get(
     "/tenants/{id_tenant}/suscripcion",

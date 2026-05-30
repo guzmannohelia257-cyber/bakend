@@ -82,7 +82,7 @@ def registrar_vehiculo(
     - 401: Token inválido o expirado
     """
     
-    # 1️⃣ Verificar que la placa no esté ya registrada por este usuario (activa)
+    # Verificar que la placa no esté ya registrada por este usuario (activa)
     vehiculo_existente = db.query(Vehiculo).filter(
         Vehiculo.placa == vehiculo_in.placa,
         Vehiculo.id_usuario == current_user.id_usuario,
@@ -95,7 +95,7 @@ def registrar_vehiculo(
             detail=f"La placa '{vehiculo_in.placa}' ya está registrada en tu cuenta"
         )
     
-    # 2️⃣ Crear el nuevo vehículo con el id_usuario del token
+    # Crear el nuevo vehículo con el id_usuario del token
     nuevo_vehiculo = Vehiculo(
         id_usuario=current_user.id_usuario,
         placa=vehiculo_in.placa,
@@ -106,7 +106,7 @@ def registrar_vehiculo(
         activo=True
     )
     
-    # 3️⃣ Guardar en la base de datos
+    # Guardar en la base de datos
     db.add(nuevo_vehiculo)
     db.commit()
     db.refresh(nuevo_vehiculo)
@@ -210,8 +210,7 @@ def obtener_vehiculo(
     vehiculo = db.query(Vehiculo).filter(
         Vehiculo.id_vehiculo == id_vehiculo
     ).first()
-    
-    # Verificar que exista
+
     if not vehiculo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -278,8 +277,7 @@ def editar_vehiculo(
     vehiculo = db.query(Vehiculo).filter(
         Vehiculo.id_vehiculo == id_vehiculo
     ).first()
-    
-    # Verificar que exista
+
     if not vehiculo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -364,8 +362,7 @@ def eliminar_vehiculo(
     vehiculo = db.query(Vehiculo).filter(
         Vehiculo.id_vehiculo == id_vehiculo
     ).first()
-    
-    # Verificar que exista
+
     if not vehiculo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

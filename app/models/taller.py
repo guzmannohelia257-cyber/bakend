@@ -13,7 +13,7 @@ class Taller(Base):
     __tablename__ = "taller"
 
     id_taller = Column(Integer, primary_key=True, index=True)
-    # Multi-tenant (Fase 1). Post-migracion 0003: NOT NULL.
+    # Multi-tenant (Fase 1). Post-migración 0003: NOT NULL.
     id_tenant = Column(Integer, ForeignKey("tenant.id_tenant"), nullable=False, index=True)
 
     nombre = Column(String(100), nullable=False)
@@ -56,7 +56,7 @@ class TallerServicio(Base):
     id_categoria = Column(Integer, ForeignKey("categoria_problema.id_categoria"), nullable=False)
     servicio_movil = Column(Boolean, default=False, nullable=False)
     tarifa_base = Column(Numeric(10, 2), nullable=True)
-    # Tiempo estimado de reparacion en minutos (referencial, lo configura el taller)
+    # Tiempo estimado de reparación en minutos (referencial, lo configura el taller)
     tiempo_estimado_min = Column(Integer, nullable=True)
 
     taller = relationship("Taller", back_populates="servicios")

@@ -10,7 +10,7 @@ from typing import Optional, List
 from datetime import datetime
 
 
-# ============ TALLER ============
+# Taller
 
 class TallerLoginRequest(BaseModel):
     email: EmailStr
@@ -52,7 +52,7 @@ class TallerTokenResponse(BaseModel):
     taller: TallerResponse
 
 
-# ============ TECNICO ============
+# Técnico
 
 class TecnicoCreate(BaseModel):
     nombre: str = Field(..., min_length=3, max_length=100)
@@ -92,7 +92,7 @@ class TecnicoTokenResponse(BaseModel):
     tecnico: TecnicoResponse
 
 
-# ============ ASIGNACIONES (lado taller) ============
+# Asignaciones (lado taller)
 
 class AceptarAsignacionRequest(BaseModel):
     id_usuario: Optional[int] = Field(None, description="Usuario técnico (rol=3) asignado al trabajo")
@@ -216,7 +216,7 @@ class AsignacionTallerResponse(BaseModel):
     id_asignacion: int
     id_incidente: int
     id_taller: int
-    id_usuario: Optional[int] = None  # Usuario técnico asignado
+    id_usuario: Optional[int] = None  # Usuario técnico asignado al trabajo
     id_estado_asignacion: int
     eta_minutos: Optional[int] = None
     costo_estimado: Optional[float] = None
@@ -232,9 +232,7 @@ class AsignacionTallerResponse(BaseModel):
         from_attributes = True
 
 
-# ============ GENÉRICOS ============
-
-# ============ ASIGNACIONES (vista del técnico) ============
+# Asignaciones (vista del técnico)
 
 class UbicacionIncidente(BaseModel):
     """Ubicación GPS del incidente"""
@@ -260,19 +258,19 @@ class TecnicoAsignacionResponse(BaseModel):
     updated_at: datetime
 
     estado: EstadoAsignacionMiniT
-    incidente: IncidenteParaTecnico  # Incluye evidencias del cliente
+    incidente: IncidenteParaTecnico  # Incluye las evidencias del cliente
 
     class Config:
         from_attributes = True
 
 
-# ============ GENÉRICOS ============
+# Genéricos
 
 class MensajeResponse(BaseModel):
     mensaje: str
 
 
-# ============ USUARIO_TALLER (Técnicos del Taller) ============
+# Usuario_taller (técnicos del taller)
 
 class UsuarioTallerCreate(BaseModel):
     """Crear un técnico (usuario rol=3) vinculado a un taller"""
@@ -325,7 +323,7 @@ class UsuarioTallerListResponse(BaseModel):
         from_attributes = True
 
 
-# ============ SERVICIOS DEL TALLER ============
+# Servicios del taller
 
 class TallerServicioCreate(BaseModel):
     id_categoria: int = Field(..., gt=0)

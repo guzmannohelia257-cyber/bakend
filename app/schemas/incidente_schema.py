@@ -6,9 +6,7 @@ from typing import Optional, List
 from datetime import datetime
 
 
-# ==========================================
-# CREAR INCIDENTE (Lo que envía Flutter)
-# ==========================================
+# Crear incidente (lo que envía Flutter)
 class IncidenteCreate(BaseModel):
     """
     Datos que envía el cliente (Flutter) cuando reporta una emergencia.
@@ -33,9 +31,7 @@ class IncidenteCreate(BaseModel):
     )
 
 
-# ==========================================
-# RESPUESTA DE INCIDENTE (Lo que responde FastAPI)
-# ==========================================
+# Respuesta de incidente (lo que responde FastAPI)
 class IncidenteResponse(BaseModel):
     """
     Respuesta completa del incidente al cliente
@@ -55,9 +51,7 @@ class IncidenteResponse(BaseModel):
         from_attributes = True
 
 
-# ==========================================
-# RESPUESTA CON RELACIONES (Más datos)
-# ==========================================
+# Respuesta con relaciones (más datos)
 class VehiculoMini(BaseModel):
     """Mini representación del vehículo"""
     id_vehiculo: int
@@ -85,9 +79,7 @@ class PrioridadMini(BaseModel):
     nivel: str
 
 
-# ==========================================
-# CANDIDATOS DE ASIGNACIÓN
-# ==========================================
+# Candidatos de asignación
 class TallerMini(BaseModel):
     """Mini representación del taller para candidatos"""
     id_taller: int
@@ -169,16 +161,14 @@ class IncidenteDetalle(BaseModel):
     estado: EstadoMini
     categoria: Optional[CategoriaMini] = None
     prioridad: Optional[PrioridadMini] = None
-    candidatos: Optional[List[CandidatoAsignacionResponse]] = None  # ← CANDIDATOS DE ASIGNACIÓN
-    asignaciones: List[AsignacionResponse] = []  # ← ASIGNACIONES (estado actual con el taller)
+    candidatos: Optional[List[CandidatoAsignacionResponse]] = None  # Candidatos de asignación
+    asignaciones: List[AsignacionResponse] = []  # Asignaciones (estado actual con el taller)
 
     class Config:
         from_attributes = True
 
 
-# ==========================================
-# CATÁLOGOS
-# ==========================================
+# Catálogos
 class CategoriaResponse(BaseModel):
     """Categoría de problema"""
     id_categoria: int

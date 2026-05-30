@@ -13,8 +13,8 @@ from app.models.transaccional import Pago
 from app.models.usuario import Usuario
 
 
-# Fallback usado solo si el tenant no esta cargado. Los porcentajes reales
-# vienen de Tenant.pct_cancel_* y son configurables por el admin.
+# Valor por defecto usado solo si el tenant no está cargado. Los porcentajes
+# reales vienen de Tenant.pct_cancel_* y son configurables por el admin.
 COMPENSACION_DEFAULT = {
     "pendiente": Decimal("0.00"),
     "aceptada": Decimal("0.50"),

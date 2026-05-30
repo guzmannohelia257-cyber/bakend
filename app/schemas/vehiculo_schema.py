@@ -7,9 +7,7 @@ from typing import Optional
 from datetime import datetime
 
 
-# ==========================================
-# SCHEMAS PARA REGISTRO (POST /vehiculos/)
-# ==========================================
+# Schemas para registro (POST /vehiculos/)
 
 class VehiculoCreate(BaseModel):
     """
@@ -63,9 +61,7 @@ class VehiculoUpdate(BaseModel):
         }
 
 
-# ==========================================
-# SCHEMAS PARA RESPUESTAS
-# ==========================================
+# Schemas para respuestas
 
 class VehiculoResponse(BaseModel):
     """

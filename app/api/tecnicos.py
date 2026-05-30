@@ -53,9 +53,7 @@ router = APIRouter(
 )
 
 
-# ============================================================
-# M9 — Login multi-taller del tecnico (PRE-LOGIN selector)
-# ============================================================
+# M9 — Login multi-taller del técnico (selector pre-login)
 
 @router.get(
     "/talleres-publicos",
@@ -67,7 +65,7 @@ def talleres_publicos(db: Session = Depends(get_db)):
     Endpoint PUBLICO (sin auth). Devuelve info no sensible de talleres activos
     para que la app movil del tecnico pueda mostrar el selector ANTES del login.
     """
-    # Bypass del filtro tenant: no hay contexto al ser pre-login
+    # Se omite el filtro de tenant: no hay contexto al ser pre-login
     tok = current_tenant.set(0)
     try:
         return (
@@ -93,7 +91,7 @@ def login_tecnico(body: TecnicoLoginConTallerRequest, db: Session = Depends(get_
       3. existe UsuarioTaller activo entre este usuario y el id_taller indicado.
     Emite JWT con `id_tenant` del taller -> filtro tenant aplica automaticamente.
     """
-    # Bypass tenant para localizar usuario y vinculo (sin contexto previo)
+    # Se omite el filtro de tenant para localizar usuario y vínculo (sin contexto previo)
     tok = current_tenant.set(0)
     try:
         usuario = db.query(Usuario).filter(Usuario.email == body.email).first()
@@ -198,9 +196,7 @@ def cambiar_taller_activo(
     )
 
 
-# ============================================================
 # Endpoints existentes (protegidos)
-# ============================================================
 
 @router.get(
     "/asignacion-actual",
@@ -212,14 +208,13 @@ def obtener_asignacion_actual(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    # Verificar que el usuario es técnico (rol=3)
     if current_user.id_rol != 3:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo usuarios con rol técnico pueden acceder a este endpoint",
         )
     
-    # Buscar asignaciones activas del técnico (id_usuario)
+    # Buscar la asignación activa del técnico (estado aceptada o en_camino)
     asignacion = db.query(Asignacion).filter(
         Asignacion.id_usuario == current_user.id_usuario,
         Asignacion.id_estado_asignacion.in_(
@@ -238,7 +233,7 @@ def obtener_asignacion_actual(
     return asignacion
 
 
-# ============ UBICACIÓN EN TIEMPO REAL ============
+# Ubicación en tiempo real
 
 @router.put(
     "/mi-ubicacion",
@@ -287,9 +282,9 @@ async def reportar_ubicacion(
     if current_user.id_rol != 3:
         raise HTTPException(403, "Solo tecnicos pueden reportar ubicacion")
 
-    # M9: usar id_tenant del JWT (taller activo elegido al login),
-    # NO `.first()` arbitrario. Si el token no trae tenant, el tecnico debe
-    # re-loguearse via POST /tecnicos/login con id_taller.
+    # M9: usar id_tenant del JWT (taller activo elegido en el login),
+    # no un `.first()` arbitrario. Si el token no trae tenant, el técnico debe
+    # volver a iniciar sesión vía POST /tecnicos/login con id_taller.
     tid = current_tenant.get()
     if tid is None:
         raise HTTPException(
@@ -383,7 +378,7 @@ async def reportar_ubicacion(
     return {"ok": True, "eta": eta_resp, "llegado_auto": llegado_auto}
 
 
-# ============ EVIDENCIAS ============
+# Evidencias
 
 @router.get(
     "/mis-asignaciones/{id_asignacion}",
@@ -450,7 +445,7 @@ def listar_evidencias(
     return evidencias
 
 
-# ============ A.2 — CU-20: TRANSICIONES EN_CAMINO Y COMPLETADA ============
+# A.2 — CU-20: transiciones en_camino y completada
 
 @router.put(
     "/mis-asignaciones/{id_asignacion}/iniciar-viaje",
@@ -464,13 +459,12 @@ def iniciar_viaje(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    # Verificar rol técnico
     if current_user.id_rol != 3:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo técnicos pueden usar este endpoint",
         )
-    
+
     asignacion = db.query(Asignacion).filter(
         Asignacion.id_asignacion == id_asignacion,
         Asignacion.id_usuario == current_user.id_usuario,
@@ -530,13 +524,12 @@ def completar_asignacion(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    # Verificar rol técnico
     if current_user.id_rol != 3:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Solo técnicos pueden usar este endpoint",
         )
-    
+
     asignacion = db.query(Asignacion).filter(
         Asignacion.id_asignacion == id_asignacion,
         Asignacion.id_usuario == current_user.id_usuario,

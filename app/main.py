@@ -43,21 +43,19 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# ==========================================
-# MIDDLEWARE: CORS (Cross-Origin Resource Sharing)
-# ==========================================
-# CORS_ORIGINS en .env (separados por coma). Si esta vacio y DEBUG=True se
-# permite "*" pero SIN credentials (combinacion ilegal por spec).
-# Produccion: poblar SIEMPRE CORS_ORIGINS con dominios exactos.
+# Middleware CORS (Cross-Origin Resource Sharing)
+# CORS_ORIGINS en .env (separados por coma). Si está vacío y DEBUG=True se
+# permite "*" pero SIN credentials (combinación ilegal por spec).
+# Producción: poblar SIEMPRE CORS_ORIGINS con dominios exactos.
 _origins_raw = (settings.CORS_ORIGINS or "").strip()
 if _origins_raw:
     cors_origins = [o.strip() for o in _origins_raw.split(",") if o.strip()]
     allow_credentials = True
 elif settings.DEBUG:
     cors_origins = ["*"]
-    allow_credentials = False  # "*" + credentials no es valido en el spec
+    allow_credentials = False  # "*" + credentials no es válido en el spec
 else:
-    # Produccion sin CORS_ORIGINS = no permitimos cross-origin (mejor fallar)
+    # Producción sin CORS_ORIGINS: no permitimos cross-origin (mejor fallar)
     cors_origins = []
     allow_credentials = False
 
@@ -70,27 +68,23 @@ app.add_middleware(
     max_age=3600,
 )
 
-# Rate limiting basico (SlowAPI)
+# Rate limiting básico (SlowAPI)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
-# ==========================================
-# MULTI-TENANT (Fase 1)
-# ==========================================
+# Multi-tenant (Fase 1)
 # Middleware: extrae id_tenant del JWT a ContextVar por request.
-# Filtro global: anade WHERE id_tenant=... a queries de modelos tenant-scoped.
+# Filtro global: añade WHERE id_tenant=... a queries de modelos tenant-scoped.
 # include_legacy=True deja pasar filas viejas con id_tenant IS NULL durante
-# el periodo de backfill. Una vez backfilleadas, cambiar a False.
+# el período de backfill. Una vez backfilleadas, cambiar a False.
 app.add_middleware(TenantContextMiddleware)
-# include_legacy=False: tras backfill (scripts/backfill_tenants.py) + migracion
+# include_legacy=False: tras backfill (scripts/backfill_tenants.py) + migración
 # 0003, no quedan filas legacy en taller. Las tablas transaccionales pueden
-# tener id_tenant NULL solo en flujos publicos (cliente final reportando), pero
+# tener id_tenant NULL solo en flujos públicos (cliente final reportando), pero
 # esos no usan filtro de tenant porque current_tenant=None.
 install_tenant_filter(include_legacy=False)
 
-# ==========================================
-# REGISTRAR ROUTERS
-# ==========================================
+# Registrar routers
 app.include_router(users_router)
 app.include_router(talleres_router)
 app.include_router(tecnicos_router)
@@ -109,13 +103,10 @@ app.include_router(kpis_router)
 app.include_router(adendas_router)
 app.include_router(ws_router)
 
-# Importar y registrar router de diagnóstico
 from app.api.diagnostico import router as diagnostico_router
 app.include_router(diagnostico_router)
 
-# ==========================================
-# ENDPOINT DE PRUEBA
-# ==========================================
+# Endpoint de prueba
 
 @app.get("/", tags=["Health Check"])
 def read_root():
@@ -142,9 +133,7 @@ def health_check():
     }
 
 
-# ==========================================
-# MANEJO DE ERRORES GLOBAL
-# ==========================================
+# Manejo de errores global
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
@@ -182,7 +171,7 @@ async def _stop_realtime() -> None:
 if __name__ == "__main__":
     import uvicorn
     # Puerto local por defecto = 8001 (el 8000 lo usa otro programa del usuario).
-    # En Render, $PORT lo inyecta la plataforma — no afecta produccion.
+    # En Render, $PORT lo inyecta la plataforma — no afecta producción.
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",

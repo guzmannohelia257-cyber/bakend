@@ -27,9 +27,7 @@ settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/usuarios/login")
 
 
-# ==========================================
-# HASH DE CONTRASEÑAS
-# ==========================================
+# Hash de contraseñas
 
 def hash_password(password: str) -> str:
     return ph.hash(password)
@@ -43,9 +41,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-# ==========================================
 # JWT
-# ==========================================
 
 def create_access_token(
     subject_id: int,
@@ -83,9 +79,7 @@ def verify_token(token: str) -> Optional[dict]:
         return None
 
 
-# ==========================================
-# DEPENDENCIAS DE AUTENTICACIÓN
-# ==========================================
+# Dependencias de autenticación
 
 _credenciales_exception = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,

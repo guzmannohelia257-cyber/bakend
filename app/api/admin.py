@@ -54,7 +54,7 @@ MONTH_NAMES = {
 }
 
 
-# ── HELPERS ───────────────────────────────────────────────────────────────────
+# Helpers
 
 def _get_taller_or_404(db: Session, id_taller: int) -> Taller:
     taller = db.get(Taller, id_taller)
@@ -90,7 +90,7 @@ def _subq_asig_completada(db: Session):
     )
 
 
-# ── CATEGORÍAS ───────────────────────────────────────────────────────────────
+# Categorías
 
 @router.get(
     "/categorias",
@@ -128,7 +128,7 @@ def crear_categoria(
     return nueva
 
 
-# ── TALLERES ──────────────────────────────────────────────────────────────────
+# Talleres
 
 @router.get(
     "/talleres",
@@ -186,7 +186,7 @@ def crear_taller(
         disponible=True,
     )
     db.add(taller)
-    db.flush()  # obtener id_taller antes de insertar servicios
+    db.flush()  # Obtener el id_taller antes de insertar los servicios
 
     for id_cat in payload.categorias:
         if db.get(CategoriaProblema, id_cat):
@@ -296,7 +296,7 @@ def eliminar_taller(
     return {"mensaje": f"Taller '{taller.nombre}' dado de baja correctamente"}
 
 
-# ── GANANCIAS ─────────────────────────────────────────────────────────────────
+# Ganancias
 
 @router.get(
     "/ganancias/mensual",
@@ -425,7 +425,7 @@ def ganancias_por_taller(
     )
 
 
-# ── NOTIFICACIONES DE PRUEBA ──────────────────────────────────────────────────
+# Notificaciones de prueba
 
 @router.post(
     "/usuarios/{id_usuario}/notificacion-prueba",

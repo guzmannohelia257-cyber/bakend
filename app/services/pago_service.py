@@ -55,7 +55,7 @@ def estimar_costo(db: Session, incidente: Incidente) -> Decimal:
     if not incidente.id_categoria:
         return ESTIMACION_FALLBACK_USD
 
-    # 1. Historico de cotizaciones aceptadas
+    # 1. Histórico de cotizaciones aceptadas
     desde = datetime.now(timezone.utc) - timedelta(days=ESTIMACION_HISTORICO_DIAS)
     hist_query = (
         db.query(

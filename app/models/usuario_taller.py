@@ -44,6 +44,6 @@ class UsuarioTaller(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    # Relationships
+    # Relaciones
     usuario = relationship("Usuario", back_populates="talleres_asociados")
     taller = relationship("Taller", back_populates="usuarios_tecnicos")

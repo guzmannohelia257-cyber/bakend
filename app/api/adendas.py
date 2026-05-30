@@ -44,7 +44,7 @@ def crear_adenda_endpoint(
     if not asig:
         raise HTTPException(404, "Asignacion no existe")
 
-    # Validacion: tecnico asignado al servicio
+    # Validación: el técnico debe estar asignado al servicio
     if asig.id_usuario is not None and asig.id_usuario != current_user.id_usuario:
         raise HTTPException(403, "No eres el tecnico asignado a este servicio")
 
@@ -75,7 +75,7 @@ def listar_adendas(
     if not asig:
         raise HTTPException(404, "Asignacion no existe")
 
-    # Cliente dueno o tecnico asignado
+    # Solo el cliente dueño o el técnico asignado pueden acceder
     incidente = asig.incidente
     es_cliente = incidente and incidente.id_usuario == current_user.id_usuario
     es_tecnico = asig.id_usuario == current_user.id_usuario

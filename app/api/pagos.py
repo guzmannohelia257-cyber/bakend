@@ -199,7 +199,7 @@ def crear_payment_intent(
         )
 
     estado_pendiente = _get_estado_pago_id(db, "pendiente")
-    # Filtrar por tipo='servicio': evita machacar un Pago tipo='preauth' o
+    # Filtrar por tipo='servicio' evita sobrescribir un Pago tipo='preauth' o
     # 'penalizacion' que pudo crearse para el mismo incidente.
     pago = (
         db.query(Pago)
@@ -375,8 +375,8 @@ def listar_mis_pagos(
         db.query(Incidente, Asignacion, Pago, EstadoPago)
         .outerjoin(sub_asig_completada, sub_asig_completada.c.id_incidente == Incidente.id_incidente)
         .outerjoin(Asignacion, Asignacion.id_asignacion == sub_asig_completada.c.id_asignacion)
-        # Filtrar tipo='servicio': sin este filtro un mismo incidente que tenga
-        # tambien Pago tipo='preauth' o 'penalizacion' aparece duplicado.
+        # Filtrar tipo='servicio': sin este filtro, un mismo incidente que tenga
+        # también un Pago tipo='preauth' o 'penalizacion' aparece duplicado.
         .outerjoin(
             Pago,
             and_(Pago.id_incidente == Incidente.id_incidente, Pago.tipo == "servicio"),
@@ -458,7 +458,7 @@ def capturar_endpoint(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    if current_user.id_rol not in (1, 3, 4):  # cliente, tecnico o admin
+    if current_user.id_rol not in (1, 3, 4):  # cliente, técnico o admin
         raise HTTPException(403, "Rol sin permiso para capturar pagos")
 
     incidente = db.get(Incidente, id_incidente)

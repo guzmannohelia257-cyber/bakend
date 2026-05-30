@@ -7,7 +7,7 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
-# ============ PLAN ============
+# Plan
 
 class PlanResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -27,7 +27,7 @@ class PlanResponse(BaseModel):
     activo: bool
 
 
-# ============ TENANT ============
+# Tenant
 
 class TenantCreate(BaseModel):
     slug: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
@@ -67,7 +67,7 @@ class TenantResponse(BaseModel):
     updated_at: datetime
 
 
-# ============ LINK TALLER <-> TENANT ============
+# Vínculo Taller <-> Tenant
 
 class TallerLinkRequest(BaseModel):
     id_taller: int = Field(..., gt=0)
@@ -79,7 +79,7 @@ class TallerLinkResponse(BaseModel):
     mensaje: str
 
 
-# ============ SIGNUP SELF-SERVICE ============
+# Registro self-service
 
 class SignupRequest(BaseModel):
     """
@@ -90,7 +90,7 @@ class SignupRequest(BaseModel):
     tenant_slug: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
     tenant_nombre: str = Field(..., min_length=3, max_length=150)
 
-    # Taller (1er taller del tenant)
+    # Taller (primer taller del tenant)
     taller_nombre: str = Field(..., min_length=3, max_length=100)
     taller_email: EmailStr
     taller_password: str = Field(..., min_length=8, max_length=128)
@@ -110,7 +110,7 @@ class SignupResponse(BaseModel):
     token_type: str = "bearer"
 
 
-# ============ SUSCRIPCION ============
+# Suscripción
 
 class SuscripcionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

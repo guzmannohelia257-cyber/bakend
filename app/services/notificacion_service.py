@@ -15,7 +15,7 @@ from app.models.transaccional import Notificacion
 
 logger = logging.getLogger("notificacion_service")
 
-# ── Firebase Admin SDK (opcional) ────────────────────────────────────────────
+# Firebase Admin SDK (opcional)
 
 _firebase_app = None
 
@@ -69,7 +69,7 @@ def _send_fcm(token: str, titulo: str, cuerpo: str, data: Optional[dict] = None)
         return False
 
 
-# ── API pública ───────────────────────────────────────────────────────────────
+# API pública
 
 def crear_y_enviar_notificacion(
     db: Session,
@@ -98,7 +98,7 @@ def crear_y_enviar_notificacion(
         enviado_push=False,
     )
     db.add(notif)
-    db.flush()  # obtener id_notificacion antes de commit
+    db.flush()  # Obtener id_notificacion antes del commit
 
     if push_token:
         enviado = _send_fcm(push_token, titulo, mensaje, data=data)

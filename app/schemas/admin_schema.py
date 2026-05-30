@@ -6,9 +6,7 @@ from typing import Optional, List
 from datetime import datetime
 
 
-# ── TALLERES ──────────────────────────────────────────────────────────────────
-
-# ── CATEGORÍAS ────────────────────────────────────────────────────────────────
+# Categorías
 
 class CategoriaAdminCreate(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=50)
@@ -24,7 +22,7 @@ class CategoriaAdminResponse(BaseModel):
         from_attributes = True
 
 
-# ── TALLERES ──────────────────────────────────────────────────────────────────
+# Talleres
 
 class TallerAdminCreate(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=100)
@@ -67,7 +65,7 @@ class TallerAdminStatsResponse(TallerAdminResponse):
     monto_total_procesado: float = 0.0
 
 
-# ── GANANCIAS ─────────────────────────────────────────────────────────────────
+# Ganancias
 
 class GananciaMensualRow(BaseModel):
     año: int

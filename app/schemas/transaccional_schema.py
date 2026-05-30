@@ -6,7 +6,7 @@ from typing import Optional, List
 from datetime import datetime
 
 
-# ── NOTIFICACIONES ────────────────────────────────────────────────────────────
+# Notificaciones
 
 class PushTokenRequest(BaseModel):
     push_token: str = Field(..., min_length=10, description="FCM device token")
@@ -27,7 +27,7 @@ class NotificacionResponse(BaseModel):
         from_attributes = True
 
 
-# ── MENSAJES ──────────────────────────────────────────────────────────────────
+# Mensajes
 
 class MensajeCreate(BaseModel):
     contenido: str = Field(..., min_length=1, max_length=2000)
@@ -46,7 +46,7 @@ class MensajeResponse(BaseModel):
         from_attributes = True
 
 
-# ── PAGOS (STUB Stripe) ────────────────────────────────────────────────────────
+# Pagos (stub de Stripe)
 
 class PagoIntentRequest(BaseModel):
     id_incidente: int

@@ -128,8 +128,8 @@ def responder_cotizacion(
         _marcar_expirada(db, cotizacion)
         raise HTTPException(410, "Esta cotizacion ya expiro")
 
-    # Calcular el traslado: distancia GPS entre taller e incidente * tarifa_traslado.
-    # Es lo que rompia el desglose: el cliente veia solo servicio+repuestos.
+    # Calcular el traslado: distancia GPS entre taller e incidente por la tarifa de traslado.
+    # Sin esto, el desglose mostraba al cliente solo servicio y repuestos.
     incidente = db.query(Incidente).get(cotizacion.id_incidente)
     distancia = None
     traslado = 0.0

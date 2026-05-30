@@ -54,9 +54,7 @@ router = APIRouter(
 )
 
 
-# ==========================================
-# CATÁLOGOS (Lectura)
-# ==========================================
+# Catálogos (lectura)
 
 @router.get(
     "/categorias",
@@ -133,9 +131,7 @@ def obtener_estados(
     return estados
 
 
-# ==========================================
-# OPERACIONES (Crear, Listar, Obtener)
-# ==========================================
+# Operaciones (crear, listar, obtener)
 
 def _ensure_estado_borrador(db: Session) -> EstadoIncidente:
     """Asegura que el estado 'borrador' exista; lo crea on-the-fly si falta."""
@@ -237,7 +233,7 @@ async def reportar_incidencia(
     a los talleres compatibles.
     """
 
-    # ✅ IDEMPOTENCIA OFFLINE: si llega un key y ya existe un incidente del mismo
+    # Idempotencia offline: si llega un key y ya existe un incidente del mismo
     # usuario con ese key, devolvemos el existente sin crear nada nuevo.
     if incidente_in.idempotency_key:
         existente = (
@@ -251,7 +247,7 @@ async def reportar_incidencia(
         if existente:
             return existente
 
-    # ✅ VALIDACIÓN: Solo 1 incidente activo (pendiente/en_proceso) por usuario
+    # Validación: solo se permite 1 incidente activo (pendiente/en_proceso) por usuario
     estado_activo_existente = db.query(Incidente).join(
         EstadoIncidente, Incidente.id_estado == EstadoIncidente.id_estado
     ).filter(
@@ -386,7 +382,7 @@ async def confirmar_incidencia(
     if talleres:
         matching_service.crear_candidatos(db, incidente, talleres_dist)
 
-        # Determinar el taller "destinatario" de la asignacion en pendiente:
+        # Determinar el taller "destinatario" de la asignación pendiente:
         # 1. Si el cliente eligió taller -> ese
         # 2. Si no, el primer candidato (más cercano)
         if payload and payload.id_taller_preferido:
@@ -403,7 +399,7 @@ async def confirmar_incidencia(
         if cand:
             cand.seleccionado = True
 
-        # Crear la asignacion en estado pendiente para que aparezca en el
+        # Crear la asignación en estado pendiente para que aparezca en el
         # dashboard del taller. Si ese taller rechaza, el endpoint de rechazo
         # se encarga de pasar al siguiente candidato.
         estado_asig_pendiente = db.query(EstadoAsignacion).filter_by(nombre="pendiente").first()
@@ -491,12 +487,12 @@ async def aceptar_emergencia(
         estado_pendiente = db.query(EstadoAsignacion).filter_by(nombre="pendiente").first()
 
         # Hay tres casos:
-        # 1. Ya existe asignacion en pendiente para ESTE taller (creada por
+        # 1. Ya existe asignación pendiente para ESTE taller (creada por
         #    /confirmar tras la elección del cliente) -> la transicionamos
         #    a 'aceptada'.
-        # 2. Ya existe asignacion en otro estado (aceptada, en_camino, etc.)
+        # 2. Ya existe asignación en otro estado (aceptada, en_camino, etc.)
         #    -> 409, ya fue tomada por otro.
-        # 3. No existe asignacion -> creamos una nueva en 'aceptada' (flujo
+        # 3. No existe asignación -> creamos una nueva en 'aceptada' (flujo
         #    legado: el taller toma el broadcast sin confirmación previa).
         existing = db.query(Asignacion).filter_by(id_incidente=id_incidente).first()
         if existing:
@@ -813,7 +809,7 @@ def obtener_ubicacion_tecnico(
     )
 
 
-# ============ CANCELAR INCIDENTE ============
+# Cancelar incidente
 
 @router.patch(
     "/{id_incidente}/cancelar",
@@ -851,7 +847,7 @@ def cancelar_incidente(
     if not estado_cancelado:
         raise HTTPException(status_code=500, detail="Estado 'cancelado' no encontrado en catálogo")
 
-    # Penalizacion automatica si la asignacion activa esta 'en_camino'.
+    # Penalización automática si la asignación activa está 'en_camino'.
     pago_penalizacion = None
     try:
         from app.models.catalogos import EstadoAsignacion
@@ -873,7 +869,7 @@ def cancelar_incidente(
                     db, incidente
                 )
     except Exception:
-        # No bloquear la cancelacion si el cobro falla; se registra en logs.
+        # No bloquear la cancelación si el cobro falla; se registra en logs.
         pago_penalizacion = None
 
     db.add(HistorialEstadoIncidente(
@@ -892,7 +888,7 @@ def cancelar_incidente(
     return incidente
 
 
-# ============ A.3 — CU-10: EVALUAR SERVICIO ============
+# A.3 — CU-10: Evaluar servicio
 
 @router.post(
     "/{id_incidente}/evaluar",
@@ -907,7 +903,7 @@ def evaluar_servicio(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ):
-    # 1. Verificar ownership del incidente
+    # 1. Verificar que el incidente pertenezca al usuario actual
     incidente = db.query(Incidente).filter(
         Incidente.id_incidente == id_incidente,
         Incidente.id_usuario == current_user.id_usuario,

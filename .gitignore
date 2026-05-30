@@ -1,15 +1,24 @@
-# Virtual Environment
+# ---------------------------------------------------------------------------
+# Entornos virtuales
+# ---------------------------------------------------------------------------
 venv/
+venv*/
+.venv
 env/
 ENV/
-.venv
 
-# Environment variables (NUNCA commitar esto con datos reales)
+# ---------------------------------------------------------------------------
+# Variables de entorno
+# Contienen secretos de ejecucion; nunca deben versionarse.
+# ---------------------------------------------------------------------------
 .env
 .env.local
 .env.*.local
 
-# Credenciales de servicios externos (NUNCA commitar)
+# ---------------------------------------------------------------------------
+# Credenciales de servicios externos
+# Claves de Firebase, Google, Stripe, etc. Nunca deben versionarse.
+# ---------------------------------------------------------------------------
 firebase-credentials.json
 google-services.json
 google-services*.json
@@ -18,24 +27,35 @@ serviceAccountKey*.json
 *.key
 secrets/
 
-# Scripts locales de debugging que NO deben subirse
-check_user_login.py
-check_tables.py
-seed_test_users.py
-test_db_connection.py
-test_rds_connection.py
-init_database.py
+# ---------------------------------------------------------------------------
+# Scripts locales de desarrollo y diagnostico
+# Utilidades puntuales (seed, debug, verificacion, pruebas manuales) que no
+# forman parte del runtime de la aplicacion. Se conservan en disco pero no
+# se versionan. La suite de pruebas formal vive en tests/ y si se versiona.
+# ---------------------------------------------------------------------------
+/check_*.py
+/create_*.py
+/debug_*.py
+/diagnostico_*.py
+/run_motor_asignacion.py
+/seed_*.py
+/verify_*.py
+/test_*.py
+/init_database.py
 
-# IDE
+# ---------------------------------------------------------------------------
+# Editores e IDE
+# ---------------------------------------------------------------------------
 .vscode/
 .idea/
+.claude/settings.local.json
 *.swp
 *.swo
 *~
-.DS_Store
-*.pyc
 
+# ---------------------------------------------------------------------------
 # Python
+# ---------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
@@ -47,7 +67,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -57,34 +76,45 @@ wheels/
 .installed.cfg
 *.egg
 
-# Testing
+# ---------------------------------------------------------------------------
+# Pruebas y cobertura
+# ---------------------------------------------------------------------------
 .pytest_cache/
 .coverage
 htmlcov/
 
-# Database
+# ---------------------------------------------------------------------------
+# Bases de datos locales
+# ---------------------------------------------------------------------------
 *.db
 *.sqlite
 *.sqlite3
 
+# ---------------------------------------------------------------------------
 # Logs
+# ---------------------------------------------------------------------------
 *.log
 logs/
 
-# OS
+# ---------------------------------------------------------------------------
+# Sistema operativo
+# ---------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
 
+# ---------------------------------------------------------------------------
 # Archivos temporales
+# ---------------------------------------------------------------------------
 *.tmp
 *.bak
 .temp/
 
-# ============================================================
-# Documentacion: NO subir markdown ni carpetas de guias.
-# Lo unico documental que se sube es CREDENCIALES.txt.
-# (requirements.txt se mantiene: es manifiesto de dependencias)
-# ============================================================
+# ---------------------------------------------------------------------------
+# Documentacion interna
+# El codigo es la fuente de verdad: no se versiona documentacion en Markdown
+# ni las carpetas de guias. Se conserva CREDENCIALES.txt por decision del
+# proyecto. requirements.txt se versiona por ser el manifiesto de dependencias.
+# ---------------------------------------------------------------------------
 *.md
 guias/
 guias2/

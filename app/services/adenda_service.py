@@ -46,7 +46,7 @@ def crear_adenda(
             f"No se puede registrar adenda sobre una asignacion '{asignacion.estado.nombre}'",
         )
 
-    # Validar que no haya otra adenda pendiente sobre la misma asignacion.
+    # Validar que no haya otra adenda pendiente sobre la misma asignación.
     abierta = (
         db.query(Adenda)
         .filter(
@@ -73,7 +73,7 @@ def crear_adenda(
     )
     db.add(ad)
 
-    # Congelar la asignacion
+    # Congelar la asignación
     asignacion.id_estado_asignacion = estado_espera.id_estado_asignacion
 
     db.commit()
@@ -103,7 +103,7 @@ def responder_adenda(
     if not asig:
         raise HTTPException(404, "Asignacion asociada a la adenda no existe")
 
-    # Validar que el cliente sea dueno del incidente.
+    # Validar que el cliente sea dueño del incidente.
     incidente = asig.incidente
     if not incidente or incidente.id_usuario != cliente.id_usuario:
         raise HTTPException(403, "Solo el dueno del incidente puede responder la adenda")
@@ -114,10 +114,10 @@ def responder_adenda(
 
     if decision == "aprobar":
         adenda.estado = "aprobada"
-        # Sumar al costo_estimado de la asignacion
+        # Sumar al costo_estimado de la asignación
         actual = float(asig.costo_estimado or 0)
         asig.costo_estimado = actual + float(adenda.monto_adicional)
-        # Reanudar al estado 'aceptada' (continua el servicio)
+        # Reanudar al estado 'aceptada' (continúa el servicio)
         estado_aceptada = db.query(EstadoAsignacion).filter_by(nombre="aceptada").first()
         if estado_aceptada:
             asig.id_estado_asignacion = estado_aceptada.id_estado_asignacion
