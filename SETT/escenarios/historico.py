@@ -93,13 +93,13 @@ def run(db: Session, ctx: Ctx) -> None:
                 microsecond=0,
             )
 
+            # Historico = solo incidentes TERMINADOS (completada/cancelada). Los
+            # incidentes activos los proveen los escenarios e01-e05; asi ningun
+            # cliente queda con un pendiente viejo que le bloquee reportar uno
+            # nuevo (la regla "1 incidente activo por usuario" da 409).
             r = random.random()
-            resultado = "completada" if r < 0.80 else ("cancelada" if r < 0.92 else "pendiente")
-            estado_inc = {
-                "completada": "atendido",
-                "cancelada": "cancelado",
-                "pendiente": "pendiente",
-            }[resultado]
+            resultado = "completada" if r < 0.85 else "cancelada"
+            estado_inc = "atendido" if resultado == "completada" else "cancelado"
 
             inc = Incidente(
                 id_tenant=taller.id_tenant,
@@ -127,10 +127,6 @@ def run(db: Session, ctx: Ctx) -> None:
                 observacion="Incidente reportado",
                 created_at=t0,
             ))
-
-            if resultado == "pendiente":
-                creados += 1
-                continue
 
             # Tiempos coherentes (en minutos desde t0).
             m_acept = random.randint(2, 8)
