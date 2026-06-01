@@ -225,6 +225,10 @@ class AsignacionTallerResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Indica si el cliente ya pagó el servicio de este incidente.
+    # Default False para no romper si el endpoint no lo setea.
+    pagado: bool = False
+
     estado: EstadoAsignacionMiniT
     incidente: IncidenteParaTaller
 

@@ -24,7 +24,9 @@ from app.db.session import get_db
 from app.models.taller import Taller, TallerServicio
 from app.models.usuario import Usuario
 from app.models.incidente import Asignacion, CandidatoAsignacion, Incidente
-from app.models.catalogos import EstadoAsignacion, EstadoIncidente, CategoriaProblema
+from app.models.catalogos import EstadoAsignacion, EstadoIncidente, CategoriaProblema, EstadoPago
+from app.models.transaccional import Pago
+from app.core.tenant_context import current_tenant
 from app.services.trazabilidad import (
     registrar_cambio_estado_asignacion,
     cambiar_estado_asignacion,
@@ -487,6 +489,45 @@ def remover_tecnico(
 
 # Asignaciones (el taller responde al cliente)
 
+def _marcar_pagos(db: Session, asignaciones: list) -> None:
+    """
+    Marca el atributo `pagado` en cada asignación de la lista.
+
+    Un incidente se considera pagado si existe un Pago de tipo 'servicio'
+    cuyo estado de pago es 'completado'. Se resuelve en una sola consulta
+    batch para todos los incidentes de la lista.
+
+    Multi-tenant: la consulta se ejecuta con tenant 0 para saltar el filtro
+    global por tenant, que de otro modo podría ocultar los pagos. Es seguro
+    porque la consulta ya está acotada a los incidentes propios del taller
+    (inc_ids), provenientes de la lista recibida.
+    """
+    inc_ids = [a.id_incidente for a in asignaciones]
+    if not inc_ids:
+        for a in asignaciones:
+            a.pagado = False
+        return
+
+    tok = current_tenant.set(0)
+    try:
+        filas = (
+            db.query(Pago.id_incidente)
+            .join(EstadoPago, EstadoPago.id_estado_pago == Pago.id_estado_pago)
+            .filter(
+                Pago.id_incidente.in_(inc_ids),
+                Pago.tipo == "servicio",
+                EstadoPago.nombre == "completado",
+            )
+            .all()
+        )
+    finally:
+        current_tenant.reset(tok)
+
+    pagados = {fila[0] for fila in filas}
+    for a in asignaciones:
+        a.pagado = a.id_incidente in pagados
+
+
 def _get_asignacion_del_taller(db: Session, id_taller: int, id_asignacion: int) -> Asignacion:
     asignacion = db.query(Asignacion).filter(
         Asignacion.id_asignacion == id_asignacion,
@@ -528,7 +569,12 @@ def listar_asignaciones(
         from datetime import datetime
         q = q.filter(Asignacion.created_at <= datetime.combine(hasta, datetime.max.time()))
     
-    return q.order_by(Asignacion.created_at.desc()).all()
+    asignaciones = q.order_by(Asignacion.created_at.desc()).all()
+
+    # Marcar el estado de pago de cada incidente antes de serializar.
+    _marcar_pagos(db, asignaciones)
+
+    return asignaciones
 
 
 @router.get(
@@ -859,6 +905,9 @@ def historial_atenciones(
 
     total = q.count()
     items = q.order_by(Asignacion.created_at.desc()).offset((pagina - 1) * por_pagina).limit(por_pagina).all()
+
+    # Marcar el estado de pago de cada incidente antes de serializar.
+    _marcar_pagos(db, items)
 
     return items
 
