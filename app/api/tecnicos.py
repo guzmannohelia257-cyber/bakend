@@ -522,6 +522,66 @@ def iniciar_viaje(
 
 
 @router.put(
+    "/mis-asignaciones/{id_asignacion}/llegue",
+    response_model=TecnicoAsignacionResponse,
+    summary="Técnico llegó al lugar (en_camino → llegado)",
+    description="El técnico marca que llegó a la ubicación del cliente. Luego podrá finalizar el servicio.",
+)
+async def marcar_llegada(
+    id_asignacion: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+):
+    if current_user.id_rol != 3:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo técnicos pueden usar este endpoint",
+        )
+
+    asignacion = db.query(Asignacion).filter(
+        Asignacion.id_asignacion == id_asignacion,
+        Asignacion.id_usuario == current_user.id_usuario,
+    ).first()
+    if not asignacion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asignación no encontrada o no asignada a ti",
+        )
+
+    estado_actual = db.get(EstadoAsignacion, asignacion.id_estado_asignacion)
+    if not estado_actual or estado_actual.nombre not in ("en_camino", "llegado"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"La asignación está en '{estado_actual.nombre if estado_actual else '?'}', "
+                f"solo se puede marcar llegada desde 'en_camino'"
+            ),
+        )
+
+    # Idempotente: si el geofence ya la marcó 'llegado', no falla; solo devuelve.
+    if estado_actual.nombre == "en_camino":
+        try:
+            cambiar_estado_asignacion(
+                db, asignacion, "llegado",
+                observacion=f"Técnico {current_user.id_usuario} ({current_user.nombre}) llegó al lugar",
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        db.commit()
+        db.refresh(asignacion)
+
+        # Avisar al cliente en vivo (la pantalla de seguimiento escucha este evento).
+        await notify_incidente(
+            asignacion.id_incidente,
+            "asignacion.llegado",
+            {"id_asignacion": asignacion.id_asignacion},
+        )
+
+    return asignacion
+
+
+@router.put(
     "/mis-asignaciones/{id_asignacion}/completar",
     response_model=TecnicoAsignacionResponse,
     summary="Servicio completado (en_camino → completada)",
