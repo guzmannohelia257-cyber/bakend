@@ -38,6 +38,7 @@ from app.schemas.tracking_schema import UbicacionPing
 from app.core.security import create_access_token, get_current_user, verify_password
 from app.core.tenant_context import current_tenant
 from app.services.trazabilidad import cambiar_estado_asignacion, cambiar_estado_incidente
+from app.services.pago_service import evaluar_penalizacion_sla
 from app.services.notificacion_service import crear_y_enviar_notificacion
 from app.services import tracking_service
 from app.services.notify_service import notify_incidente
@@ -634,6 +635,12 @@ def completar_asignacion(
         )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    # Penalizar al taller si incumplió el SLA de llegada (no debe romper el cierre).
+    try:
+        evaluar_penalizacion_sla(db, asignacion)
+    except Exception:
+        pass
 
     # Cerrar el incidente: cualquier estado activo → atendido
     incidente = db.get(Incidente, asignacion.id_incidente)

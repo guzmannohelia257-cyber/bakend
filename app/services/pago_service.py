@@ -17,14 +17,17 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models.catalogos import EstadoPago, MetodoPago
+from app.models.catalogos import EstadoAsignacion, EstadoPago, MetodoPago
 from app.models.cotizacion import Cotizacion, EstadoCotizacion
-from app.models.incidente import Asignacion, Incidente
-from app.models.taller import TallerServicio
+from app.models.incidente import Asignacion, HistorialEstadoAsignacion, Incidente
+from app.models.taller import Taller, TallerServicio
+from app.models.tenant import Tenant
 from app.models.transaccional import Pago
 
 
 PENALIZACION_FIJA_USD = Decimal("5.00")
+PENALIZACION_SLA_DEFAULT_PCT = 15
+SLA_TOLERANCIA_MIN = 20
 ESTIMACION_FALLBACK_USD = Decimal("20.00")
 ESTIMACION_HISTORICO_DIAS = 90
 ESTIMACION_HISTORICO_MINIMO = 3
@@ -284,3 +287,110 @@ def asignacion_en_camino(db: Session, incidente: Incidente) -> Optional[Asignaci
         .order_by(Asignacion.created_at.desc())
         .first()
     )
+
+
+def _ts_transicion(db: Session, id_asignacion: int, nombre_estado: str):
+    """Timestamp mas reciente en que la asignacion transiciono al estado dado.
+
+    Lee HistorialEstadoAsignacion uniendo con EstadoAsignacion por nombre y
+    tomando el created_at del registro mas reciente cuyo estado_nuevo coincide.
+    """
+    fila = (
+        db.query(HistorialEstadoAsignacion.created_at)
+        .join(
+            EstadoAsignacion,
+            EstadoAsignacion.id_estado_asignacion
+            == HistorialEstadoAsignacion.id_estado_nuevo,
+        )
+        .filter(
+            HistorialEstadoAsignacion.id_asignacion == id_asignacion,
+            EstadoAsignacion.nombre == nombre_estado,
+        )
+        .order_by(HistorialEstadoAsignacion.created_at.desc())
+        .first()
+    )
+    return fila[0] if fila else None
+
+
+def evaluar_penalizacion_sla(db: Session, asignacion: Asignacion) -> Optional[Pago]:
+    """Penaliza al taller si incumplio el SLA de llegada.
+
+    Limite de llegada = eta_minutos + tolerancia (20 min). El tiempo real es la
+    diferencia entre el timestamp del estado 'llegado' y el de 'en_camino' en
+    HistorialEstadoAsignacion. Si el tiempo real supera el limite, se cobra
+    pct% del monto final del servicio (asignacion.costo_estimado).
+
+    No hace commit: usa db.add/flush. El endpoint que lo invoca commitea.
+    Retorna el Pago de penalizacion creado, o None si no aplica.
+    """
+    if (
+        asignacion.eta_minutos is None
+        or asignacion.costo_estimado is None
+        or Decimal(str(asignacion.costo_estimado)) <= 0
+    ):
+        return None
+
+    en_camino_ts = _ts_transicion(db, asignacion.id_asignacion, "en_camino")
+    llegado_ts = _ts_transicion(db, asignacion.id_asignacion, "llegado")
+    if en_camino_ts is None or llegado_ts is None:
+        return None
+
+    tiempo_real_min = (llegado_ts - en_camino_ts).total_seconds() / 60
+    limite = asignacion.eta_minutos + SLA_TOLERANCIA_MIN
+    if tiempo_real_min <= limite:
+        # El taller cumplio el SLA: no hay penalizacion.
+        return None
+
+    tenant = (
+        db.query(Tenant).filter(Tenant.id_tenant == asignacion.id_tenant).first()
+    )
+    pct = tenant.pct_penalizacion_sla if tenant else PENALIZACION_SLA_DEFAULT_PCT
+
+    monto = (
+        Decimal(str(asignacion.costo_estimado)) * Decimal(pct) / Decimal("100")
+    ).quantize(Decimal("0.01"))
+
+    estado_pago_pendiente = (
+        db.query(EstadoPago).filter(EstadoPago.nombre == "pendiente").first()
+    )
+    if not estado_pago_pendiente:
+        estado_pago_pendiente = db.query(EstadoPago).first()
+    metodo = (
+        db.query(MetodoPago).order_by(MetodoPago.id_metodo_pago.asc()).first()
+    )
+    if not estado_pago_pendiente or not metodo:
+        return None
+
+    pago = Pago(
+        id_tenant=asignacion.id_tenant,
+        id_incidente=asignacion.id_incidente,
+        id_metodo_pago=metodo.id_metodo_pago,
+        id_estado_pago=estado_pago_pendiente.id_estado_pago,
+        tipo="penalizacion",
+        monto_total=monto,
+        comision_plataforma=monto,
+        monto_taller=Decimal("0.00"),
+        referencia_externa=f"penalizacion-sla-{asignacion.id_asignacion}",
+    )
+    db.add(pago)
+    db.flush()
+
+    # Avisar al taller que se aplico la penalizacion.
+    from app.services.notificacion_service import crear_y_enviar_notificacion
+
+    taller = (
+        db.query(Taller).filter(Taller.id_taller == asignacion.id_taller).first()
+    )
+    crear_y_enviar_notificacion(
+        db,
+        titulo="Penalizacion por retraso",
+        mensaje=(
+            f"Se aplico una penalizacion del {pct}% (Bs {monto}) por superar "
+            "el tiempo estimado de llegada."
+        ),
+        id_taller=asignacion.id_taller,
+        id_incidente=asignacion.id_incidente,
+        push_token=taller.push_token if taller else None,
+    )
+
+    return pago
