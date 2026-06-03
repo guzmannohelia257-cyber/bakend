@@ -17,7 +17,6 @@ from app.db.session import get_db
 from app.models.usuario import Usuario, Vehiculo
 from app.models.usuario_taller import UsuarioTaller
 from app.models.incidente import Incidente, Asignacion, CandidatoAsignacion, Evaluacion
-from app.models.ubicacion import UbicacionTecnico
 from app.models.catalogos import CategoriaProblema, Prioridad, EstadoIncidente, EstadoAsignacion
 from app.models.transaccional import Metrica
 from app.models.taller import Taller
@@ -787,34 +786,17 @@ async def obtener_ubicacion_tecnico(
             detail="El técnico todavía no está disponible para seguimiento"
         )
 
-    # Fuente unica del ETA: la ultima fila UbicacionTecnico de esta asignacion
-    # (la misma que usa GET /asignaciones/{id}/eta). Fallback a UsuarioTaller si
-    # el tecnico todavia no ha emitido ninguna UbicacionTecnico.
-    ultimo = (
-        db.query(UbicacionTecnico)
-        .filter(UbicacionTecnico.id_asignacion == asignacion.id_asignacion)
-        .order_by(UbicacionTecnico.created_at.desc())
-        .first()
-    )
+    ubicacion = db.query(UsuarioTaller).filter(
+        UsuarioTaller.id_usuario == asignacion.id_usuario,
+        UsuarioTaller.id_taller == asignacion.id_taller,
+        UsuarioTaller.activo == True,
+    ).first()
 
-    if ultimo:
-        lat_tec = ultimo.latitud
-        lng_tec = ultimo.longitud
-    else:
-        ubicacion = db.query(UsuarioTaller).filter(
-            UsuarioTaller.id_usuario == asignacion.id_usuario,
-            UsuarioTaller.id_taller == asignacion.id_taller,
-            UsuarioTaller.activo == True,
-        ).first()
-
-        if not ubicacion or ubicacion.latitud is None or ubicacion.longitud is None:
-            raise HTTPException(
-                status_code=404,
-                detail="El técnico aún no ha compartido su ubicación"
-            )
-
-        lat_tec = ubicacion.latitud
-        lng_tec = ubicacion.longitud
+    if not ubicacion or ubicacion.latitud is None or ubicacion.longitud is None:
+        raise HTTPException(
+            status_code=404,
+            detail="El técnico aún no ha compartido su ubicación"
+        )
 
     tecnico = db.query(Usuario).filter(Usuario.id_usuario == asignacion.id_usuario).first()
 
@@ -823,7 +805,7 @@ async def obtener_ubicacion_tecnico(
     from app.services import tracking_service
 
     dist_km, eta_seg = await tracking_service.calcular_eta(
-        lat_tec, lng_tec,
+        ubicacion.latitud, ubicacion.longitud,
         incidente.latitud, incidente.longitud,
     )
 
@@ -833,8 +815,8 @@ async def obtener_ubicacion_tecnico(
         id_tecnico=asignacion.id_usuario,
         nombre_tecnico=(tecnico.nombre if tecnico else "Técnico"),
         estado_asignacion=(asignacion.estado.nombre if asignacion.estado else "desconocido"),
-        latitud_tecnico=lat_tec,
-        longitud_tecnico=lng_tec,
+        latitud_tecnico=ubicacion.latitud,
+        longitud_tecnico=ubicacion.longitud,
         distancia_km=round(dist_km, 2),
         eta_minutos=round(eta_seg / 60),
     )
