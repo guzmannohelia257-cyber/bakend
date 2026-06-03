@@ -335,17 +335,18 @@ def _ts_transicion(db: Session, id_asignacion: int, nombre_estado: str):
 
 
 def evaluar_penalizacion_sla(db: Session, asignacion: Asignacion) -> Optional[Pago]:
-    """Penaliza al taller si incumplio el SLA de llegada.
+    """Aplica un descuento al cliente si el taller incumplio el SLA de llegada.
 
     Limite de llegada = eta_minutos + tolerancia, donde el porcentaje y la
     tolerancia se leen de la configuracion GLOBAL de la plataforma
     (ConfiguracionPlataforma). El tiempo real es la diferencia entre el
     timestamp del estado 'llegado' y el de 'en_camino' en
-    HistorialEstadoAsignacion. Si el tiempo real supera el limite, se cobra
-    pct% del monto final del servicio (asignacion.costo_estimado).
+    HistorialEstadoAsignacion. Si el tiempo real supera el limite, se aplica un
+    DESCUENTO del pct% al cliente (reduce asignacion.costo_estimado): el cliente
+    paga menos y el taller absorbe el descuento. NO se cobra a la plataforma.
 
-    No hace commit: usa db.add/flush. El endpoint que lo invoca commitea.
-    Retorna el Pago de penalizacion creado, o None si no aplica.
+    No hace commit: usa db.flush. El endpoint que lo invoca commitea.
+    Retorna None.
     """
     if (
         asignacion.eta_minutos is None
@@ -368,36 +369,18 @@ def evaluar_penalizacion_sla(db: Session, asignacion: Asignacion) -> Optional[Pa
         # El taller cumplio el SLA: no hay penalizacion.
         return None
 
-    monto = (
+    # El retardo es un DESCUENTO al cliente: paga pct% menos sobre el monto del
+    # servicio. El taller absorbe ese descuento (recibe menos); NO se cobra a la
+    # plataforma. Se reduce el costo que el cliente vera al pagar.
+    descuento = (
         Decimal(str(asignacion.costo_estimado)) * Decimal(pct) / Decimal("100")
     ).quantize(Decimal("0.01"))
-
-    estado_pago_pendiente = (
-        db.query(EstadoPago).filter(EstadoPago.nombre == "pendiente").first()
-    )
-    if not estado_pago_pendiente:
-        estado_pago_pendiente = db.query(EstadoPago).first()
-    metodo = (
-        db.query(MetodoPago).order_by(MetodoPago.id_metodo_pago.asc()).first()
-    )
-    if not estado_pago_pendiente or not metodo:
-        return None
-
-    pago = Pago(
-        id_tenant=asignacion.id_tenant,
-        id_incidente=asignacion.id_incidente,
-        id_metodo_pago=metodo.id_metodo_pago,
-        id_estado_pago=estado_pago_pendiente.id_estado_pago,
-        tipo="penalizacion",
-        monto_total=monto,
-        comision_plataforma=monto,
-        monto_taller=Decimal("0.00"),
-        referencia_externa=f"penalizacion-sla-{asignacion.id_asignacion}",
-    )
-    db.add(pago)
+    asignacion.costo_estimado = (
+        Decimal(str(asignacion.costo_estimado)) - descuento
+    ).quantize(Decimal("0.01"))
     db.flush()
 
-    # Avisar al taller que se aplico la penalizacion.
+    # Avisar al taller que su cobro se redujo por el retraso.
     from app.services.notificacion_service import crear_y_enviar_notificacion
 
     taller = (
@@ -405,14 +388,14 @@ def evaluar_penalizacion_sla(db: Session, asignacion: Asignacion) -> Optional[Pa
     )
     crear_y_enviar_notificacion(
         db,
-        titulo="Penalizacion por retraso",
+        titulo="Descuento por retraso",
         mensaje=(
-            f"Se aplico una penalizacion del {pct}% (Bs {monto}) por superar "
-            "el tiempo estimado de llegada."
+            f"Por superar el tiempo estimado de llegada se aplico un descuento "
+            f"del {pct}% al cliente (Bs {descuento} menos); tu cobro se reduce."
         ),
         id_taller=asignacion.id_taller,
         id_incidente=asignacion.id_incidente,
         push_token=taller.push_token if taller else None,
     )
 
-    return pago
+    return None
