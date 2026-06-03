@@ -202,7 +202,7 @@ def cambiar_taller_activo(
     "/asignacion-actual",
     response_model=TecnicoAsignacionResponse,
     summary="Obtener asignación activa del técnico",
-    description="Retorna la asignación activa del técnico (estado 'aceptada' o 'en_camino'). Requiere ser un usuario con rol de técnico (id_rol=3).",
+    description="Retorna la asignación activa del técnico (estado 'aceptada', 'en_camino' o 'llegado'). Requiere ser un usuario con rol de técnico (id_rol=3).",
 )
 def obtener_asignacion_actual(
     db: Session = Depends(get_db),
@@ -214,12 +214,12 @@ def obtener_asignacion_actual(
             detail="Solo usuarios con rol técnico pueden acceder a este endpoint",
         )
     
-    # Buscar la asignación activa del técnico (estado aceptada o en_camino)
+    # Buscar la asignación activa del técnico (estado aceptada, en_camino o llegado)
     asignacion = db.query(Asignacion).filter(
         Asignacion.id_usuario == current_user.id_usuario,
         Asignacion.id_estado_asignacion.in_(
             db.query(EstadoAsignacion.id_estado_asignacion).filter(
-                EstadoAsignacion.nombre.in_(["aceptada", "en_camino"])
+                EstadoAsignacion.nombre.in_(["aceptada", "en_camino", "llegado"])
             )
         ),
     ).first()
@@ -584,8 +584,8 @@ async def marcar_llegada(
 @router.put(
     "/mis-asignaciones/{id_asignacion}/completar",
     response_model=TecnicoAsignacionResponse,
-    summary="Servicio completado (en_camino → completada)",
-    description="Marca el servicio como completado. Requiere rol=3 (técnico).",
+    summary="Servicio completado (en_camino/llegado → completada)",
+    description="Marca el servicio como completado (desde 'en_camino' o 'llegado'). Requiere rol=3 (técnico).",
 )
 def completar_asignacion(
     id_asignacion: int,

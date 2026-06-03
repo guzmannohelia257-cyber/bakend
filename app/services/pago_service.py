@@ -253,19 +253,24 @@ def penalizar_por_cancelacion(
 
 def asignacion_en_camino(db: Session, incidente: Incidente) -> Optional[Asignacion]:
     """
-    Retorna la asignacion activa si esta en estado 'en_camino' (o
-    'aceptada' como caso conservador) — usada para decidir penalizacion.
+    Retorna la asignacion activa si esta en estado 'en_camino' o 'llegado'
+    (o 'aceptada' como caso conservador) — usada para decidir penalizacion.
     """
     from app.models.catalogos import EstadoAsignacion
 
     estado_en_camino = (
         db.query(EstadoAsignacion).filter_by(nombre="en_camino").first()
     )
+    estado_llegado = (
+        db.query(EstadoAsignacion).filter_by(nombre="llegado").first()
+    )
     estado_aceptada = (
         db.query(EstadoAsignacion).filter_by(nombre="aceptada").first()
     )
     ids_objetivo = [
-        e.id_estado_asignacion for e in (estado_en_camino, estado_aceptada) if e
+        e.id_estado_asignacion
+        for e in (estado_en_camino, estado_llegado, estado_aceptada)
+        if e
     ]
     if not ids_objetivo:
         return None

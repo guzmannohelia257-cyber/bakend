@@ -642,7 +642,7 @@ async def aceptar_asignacion(
             Asignacion.id_usuario == payload.id_usuario,
             Asignacion.id_estado_asignacion.in_(
                 db.query(EstadoAsignacion.id_estado_asignacion).filter(
-                    EstadoAsignacion.nombre.in_(["aceptada", "en_camino"])
+                    EstadoAsignacion.nombre.in_(["aceptada", "en_camino", "llegado"])
                 )
             ),
             Asignacion.id_asignacion != id_asignacion  # Excluir la asignación actual.

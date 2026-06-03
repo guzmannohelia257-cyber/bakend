@@ -57,12 +57,12 @@ def _ids_estados_activos(db: Session) -> list:
     Obtiene dinámicamente los IDs de los estados ACTIVOS buscando por nombre.
     Esto evita hardcodear [1,2,3] que pueden cambiar según el seed.
     
-    Estados activos: pendiente, aceptada, en_camino
+    Estados activos: pendiente, aceptada, en_camino, llegado
     """
     from app.models.catalogos import EstadoAsignacion
-    
+
     estados = db.query(EstadoAsignacion).filter(
-        EstadoAsignacion.nombre.in_(["pendiente", "aceptada", "en_camino"])
+        EstadoAsignacion.nombre.in_(["pendiente", "aceptada", "en_camino", "llegado"])
     ).all()
     
     return [e.id_estado_asignacion for e in estados]

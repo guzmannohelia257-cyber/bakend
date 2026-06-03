@@ -778,7 +778,7 @@ def obtener_ubicacion_tecnico(
         )
 
     estado_nombre = (asignacion.estado.nombre if asignacion.estado else "").lower()
-    if estado_nombre not in {"aceptada", "en_camino", "completada"}:
+    if estado_nombre not in {"aceptada", "en_camino", "llegado", "completada"}:
         raise HTTPException(
             status_code=404,
             detail="El técnico todavía no está disponible para seguimiento"
@@ -847,20 +847,24 @@ def cancelar_incidente(
     if not estado_cancelado:
         raise HTTPException(status_code=500, detail="Estado 'cancelado' no encontrado en catálogo")
 
-    # Penalización automática si la asignación activa está 'en_camino'.
+    # Penalización automática si la asignación activa está 'en_camino' o 'llegado'
+    # (en ambos casos el técnico ya salió/llegó al sitio).
     pago_penalizacion = None
     try:
         from app.models.catalogos import EstadoAsignacion
 
-        estado_en_camino = (
-            db.query(EstadoAsignacion).filter_by(nombre="en_camino").first()
-        )
-        if estado_en_camino:
+        ids_penalizables = [
+            row[0]
+            for row in db.query(EstadoAsignacion.id_estado_asignacion).filter(
+                EstadoAsignacion.nombre.in_(["en_camino", "llegado"])
+            ).all()
+        ]
+        if ids_penalizables:
             asig_en_camino = (
                 db.query(Asignacion)
                 .filter(
                     Asignacion.id_incidente == incidente.id_incidente,
-                    Asignacion.id_estado_asignacion == estado_en_camino.id_estado_asignacion,
+                    Asignacion.id_estado_asignacion.in_(ids_penalizables),
                 )
                 .first()
             )
