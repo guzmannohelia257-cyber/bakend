@@ -590,6 +590,63 @@ def obtener_asignacion(
     return _get_asignacion_del_taller(db, current_taller.id_taller, id_asignacion)
 
 
+@router.get(
+    "/mi-taller/asignaciones/{id_asignacion}/cotizacion-estimada",
+    summary="Cotizacion estimada que vio el cliente (base de reparacion + traslado)",
+)
+def cotizacion_estimada_asignacion(
+    id_asignacion: int,
+    db: Session = Depends(get_db),
+    current_taller: Taller = Depends(get_current_taller),
+):
+    """Reconstruye el precio que vio el cliente al elegir el taller: base de
+    reparacion del servicio de la categoria + traslado (tarifa por km x
+    distancia). Si ya hay costo_estimado guardado, lo usa como total."""
+    asignacion = _get_asignacion_del_taller(db, current_taller.id_taller, id_asignacion)
+    incidente = db.get(Incidente, asignacion.id_incidente)
+
+    base_rep = 0.0
+    traslado = 0.0
+    distancia_km = None
+    tiempo_rep = None
+    if incidente is not None:
+        servicio_cat = (
+            db.query(TallerServicio)
+            .filter(
+                TallerServicio.id_taller == current_taller.id_taller,
+                TallerServicio.id_categoria == incidente.id_categoria,
+            )
+            .first()
+        )
+        if servicio_cat is not None:
+            base_rep = float(servicio_cat.tarifa_base or 0)
+            tiempo_rep = servicio_cat.tiempo_estimado_min
+        if (
+            incidente.latitud is not None and incidente.longitud is not None
+            and current_taller.latitud is not None and current_taller.longitud is not None
+        ):
+            d = _haversine_km(
+                current_taller.latitud, current_taller.longitud,
+                incidente.latitud, incidente.longitud,
+            )
+            distancia_km = round(d, 2)
+            traslado = round(float(current_taller.tarifa_traslado or 0) * d, 2)
+
+    total = (
+        float(asignacion.costo_estimado)
+        if asignacion.costo_estimado is not None
+        else round(base_rep + traslado, 2)
+    )
+    return {
+        "base_reparacion": round(base_rep, 2),
+        "traslado": round(traslado, 2),
+        "total": round(total, 2),
+        "distancia_km": distancia_km,
+        "tiempo_reparacion_min": tiempo_rep,
+        "eta_minutos": asignacion.eta_minutos,
+    }
+
+
 @router.put(
     "/mi-taller/asignaciones/{id_asignacion}/aceptar",
     response_model=AsignacionTallerResponse,
@@ -674,6 +731,43 @@ async def aceptar_asignacion(
     elif payload.eta_minutos is not None:
         # Fallback solo si faltan coordenadas para calcularlo.
         asignacion.eta_minutos = payload.eta_minutos
+
+    # Persistir la cotizacion estimada que vio el cliente (base de reparacion del
+    # servicio de la categoria + traslado por distancia) como base del pago del
+    # servicio y del cobro por cancelacion. Solo si aun no hay un costo (p.ej.
+    # proveniente de una cotizacion aceptada). Sin esto el costo_estimado quedaba
+    # NULL y la compensacion por cancelacion salia 0 (no se generaba el pago).
+    if asignacion.costo_estimado is None and incidente_eta is not None:
+        servicio_cat = (
+            db.query(TallerServicio)
+            .filter(
+                TallerServicio.id_taller == current_taller.id_taller,
+                TallerServicio.id_categoria == incidente_eta.id_categoria,
+            )
+            .first()
+        )
+        base_rep = (
+            float(servicio_cat.tarifa_base)
+            if servicio_cat and servicio_cat.tarifa_base
+            else 0.0
+        )
+        traslado = 0.0
+        if (
+            incidente_eta.latitud is not None and incidente_eta.longitud is not None
+            and current_taller.latitud is not None and current_taller.longitud is not None
+        ):
+            d_cot = _haversine_km(
+                current_taller.latitud, current_taller.longitud,
+                incidente_eta.latitud, incidente_eta.longitud,
+            )
+            traslado = float(current_taller.tarifa_traslado or 0) * d_cot
+        asignacion.costo_estimado = round(base_rep + traslado, 2)
+        if (
+            servicio_cat is not None
+            and getattr(asignacion, "tiempo_estimado_reparacion_min", None) is None
+        ):
+            asignacion.tiempo_estimado_reparacion_min = servicio_cat.tiempo_estimado_min
+
     if payload.nota:
         asignacion.nota_taller = payload.nota
 
