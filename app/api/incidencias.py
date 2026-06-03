@@ -648,6 +648,8 @@ class TecnicoUbicacionResponse(BaseModel):
     estado_asignacion: str
     latitud_tecnico: float
     longitud_tecnico: float
+    distancia_km: Optional[float] = None
+    eta_minutos: Optional[int] = None
 
 
 @router.put(
@@ -751,7 +753,7 @@ def obtener_incidencia(
     summary="Obtener ubicación actual del técnico",
     description="Retorna la posición actual del técnico asignado para que el cliente lo visualice en tiempo real."
 )
-def obtener_ubicacion_tecnico(
+async def obtener_ubicacion_tecnico(
     id_incidente: int,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user)
@@ -798,6 +800,15 @@ def obtener_ubicacion_tecnico(
 
     tecnico = db.query(Usuario).filter(Usuario.id_usuario == asignacion.id_usuario).first()
 
+    # Distancia/ETA con OSRM (el MISMO calculo que ve el tecnico y el cliente en
+    # vivo), para que el tiempo/distancia sea consistente en todas las vistas.
+    from app.services import tracking_service
+
+    dist_km, eta_seg = await tracking_service.calcular_eta(
+        ubicacion.latitud, ubicacion.longitud,
+        incidente.latitud, incidente.longitud,
+    )
+
     return TecnicoUbicacionResponse(
         id_incidente=id_incidente,
         id_asignacion=asignacion.id_asignacion,
@@ -806,6 +817,8 @@ def obtener_ubicacion_tecnico(
         estado_asignacion=(asignacion.estado.nombre if asignacion.estado else "desconocido"),
         latitud_tecnico=ubicacion.latitud,
         longitud_tecnico=ubicacion.longitud,
+        distancia_km=round(dist_km, 2),
+        eta_minutos=round(eta_seg / 60),
     )
 
 
