@@ -25,6 +25,9 @@ class ConfiguracionPlataforma(Base):
     # sla_tolerancia_min   : minutos de tolerancia sobre el eta_minutos.
     sla_penalizacion_pct = Column(Integer, default=15, nullable=False, server_default="15")
     sla_tolerancia_min = Column(Integer, default=20, nullable=False, server_default="20")
+    # comision_plataforma_pct: % que la plataforma retiene de cada servicio
+    # (lo que NO recibe el taller). Antes estaba fijo en 10%.
+    comision_plataforma_pct = Column(Integer, default=10, nullable=False, server_default="10")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

@@ -109,6 +109,7 @@ class ConfiguracionResponse(BaseModel):
     """Parametros globales que aplican a TODOS los talleres."""
     sla_penalizacion_pct: int = Field(..., description="% que se cobra al taller por incumplir el SLA de llegada")
     sla_tolerancia_min: int = Field(..., description="Minutos de tolerancia sobre el eta antes de penalizar")
+    comision_plataforma_pct: int = Field(10, description="% que la plataforma retiene de cada servicio")
 
     class Config:
         from_attributes = True
@@ -118,3 +119,4 @@ class ConfiguracionUpdate(BaseModel):
     """Actualizacion parcial: solo se aplican los campos enviados."""
     sla_penalizacion_pct: Optional[int] = Field(None, ge=0, le=100)
     sla_tolerancia_min: Optional[int] = Field(None, ge=0, le=600)
+    comision_plataforma_pct: Optional[int] = Field(None, ge=0, le=100)
