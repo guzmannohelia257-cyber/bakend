@@ -45,7 +45,7 @@ async def calcular_eta(
         f"{lng_origen},{lat_origen};{lng_destino},{lat_destino}?overview=false"
     )
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=6.0) as client:
             resp = await client.get(url)
             data = resp.json()
             if data.get("code") == "Ok" and data.get("routes"):
