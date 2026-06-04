@@ -987,12 +987,22 @@ def rechazar_asignacion(
                 )
                 # TODO CU-32: enviar notificación push al nuevo taller.
         else:
-            # No hay más candidatos: dejar para reasignación manual o cancelar.
+            # No hay mas candidatos: la emergencia no tiene taller que la atienda.
+            # Se cierra (cancelado) para que el incidente no quede 'pendiente'
+            # bloqueando al cliente (guard de "1 emergencia activa").
             import logging
             logger = logging.getLogger("talleres")
             logger.warning(
-                f"[B.1] Incidente {incidente.id_incidente}: no hay más candidatos tras rechazo de {current_taller.id_taller}"
+                f"[B.1] Incidente {incidente.id_incidente}: no hay más candidatos tras "
+                f"rechazo de {current_taller.id_taller}; se cancela el incidente."
             )
+            try:
+                cambiar_estado_incidente(
+                    db, incidente, "cancelado",
+                    observacion="Sin talleres disponibles: todos rechazaron",
+                )
+            except ValueError:
+                pass
 
     db.commit()
     db.refresh(asignacion)

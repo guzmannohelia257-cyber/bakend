@@ -190,6 +190,25 @@ def cancelar_asignacion(
                 )
             )
 
+    # Cierra tambien el INCIDENTE. Si solo se cancela la asignacion, el incidente
+    # queda 'pendiente'/'en_proceso' (activo) y bloquea reportar otra emergencia
+    # (guard de "1 activa"), aunque el historial lo muestre cancelado.
+    from app.models.incidente import Incidente
+    from app.models.catalogos import EstadoIncidente
+    from app.services.trazabilidad import cambiar_estado_incidente
+
+    incidente = db.get(Incidente, asignacion.id_incidente)
+    if incidente:
+        estado_inc = db.get(EstadoIncidente, incidente.id_estado)
+        if estado_inc and estado_inc.nombre in ("pendiente", "en_proceso"):
+            try:
+                cambiar_estado_incidente(
+                    db, incidente, "cancelado",
+                    observacion="Cancelado por el cliente (cancelacion de asignacion)",
+                )
+            except ValueError:
+                pass
+
     db.commit()
     db.refresh(asignacion)
     return asignacion, "cancelada", sin_penalizacion_por_retraso
