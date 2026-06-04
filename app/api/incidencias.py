@@ -637,7 +637,13 @@ def analizar_incidente_con_ia(
 
 
 class CambiarTallerRequest(BaseModel):
-    id_candidato: int = Field(..., description="ID del candidato de asignacion a seleccionar")
+    id_candidato: Optional[int] = Field(
+        default=None, description="ID del candidato de asignacion a seleccionar"
+    )
+    id_taller: Optional[int] = Field(
+        default=None,
+        description="ID del taller a reasignar (alternativa a id_candidato; p.ej. al elegir otro taller mientras se espera).",
+    )
 
 
 class TecnicoUbicacionResponse(BaseModel):
@@ -674,34 +680,47 @@ def cambiar_taller(
             detail="Incidencia no encontrada o no tienes permiso",
         )
 
-    nuevo = db.query(CandidatoAsignacion).filter(
-        CandidatoAsignacion.id_candidato == payload.id_candidato,
-        CandidatoAsignacion.id_incidente == id_incidente,
-    ).first()
-    if not nuevo:
-        raise HTTPException(
-            status_code=404,
-            detail="El candidato no existe o no pertenece a esta incidencia",
-        )
+    # Resolver el taller destino por id_candidato o por id_taller directo.
+    if payload.id_candidato is not None:
+        nuevo = db.query(CandidatoAsignacion).filter(
+            CandidatoAsignacion.id_candidato == payload.id_candidato,
+            CandidatoAsignacion.id_incidente == id_incidente,
+        ).first()
+        if not nuevo:
+            raise HTTPException(
+                status_code=404,
+                detail="El candidato no existe o no pertenece a esta incidencia",
+            )
+        id_taller_destino = nuevo.id_taller
+    elif payload.id_taller is not None:
+        id_taller_destino = payload.id_taller
+    else:
+        raise HTTPException(status_code=400, detail="Indica id_candidato o id_taller")
 
+    # Deselecciona todos los candidatos y marca el del taller destino (si existe).
     db.query(CandidatoAsignacion).filter(
         CandidatoAsignacion.id_incidente == id_incidente
     ).update({CandidatoAsignacion.seleccionado: False}, synchronize_session=False)
-    nuevo.seleccionado = True
+    cand_destino = db.query(CandidatoAsignacion).filter(
+        CandidatoAsignacion.id_incidente == id_incidente,
+        CandidatoAsignacion.id_taller == id_taller_destino,
+    ).first()
+    if cand_destino:
+        cand_destino.seleccionado = True
 
     asignacion = db.query(Asignacion).filter(
         Asignacion.id_incidente == id_incidente
     ).order_by(Asignacion.created_at.desc()).first()
 
     if asignacion:
-        asignacion.id_taller = nuevo.id_taller
+        asignacion.id_taller = id_taller_destino
         asignacion.id_usuario = None
     else:
         estado_pendiente = db.query(EstadoAsignacion).filter_by(nombre="pendiente").first()
         id_estado_pendiente = estado_pendiente.id_estado_asignacion if estado_pendiente else 1
         db.add(Asignacion(
             id_incidente=id_incidente,
-            id_taller=nuevo.id_taller,
+            id_taller=id_taller_destino,
             id_estado_asignacion=id_estado_pendiente,
         ))
 
