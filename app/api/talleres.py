@@ -862,6 +862,21 @@ async def aceptar_asignacion(
             },
         )
 
+    # Evento en tiempo real al CLIENTE (canal incidente:{id}) para que la
+    # pantalla de espera navegue al detalle sin depender del push FCM.
+    from app.services.notify_service import notify_incidente
+    await notify_incidente(
+        asignacion.id_incidente,
+        "incidente.asignado",
+        {
+            "id_incidente": asignacion.id_incidente,
+            "id_asignacion": asignacion.id_asignacion,
+            "id_taller": current_taller.id_taller,
+            "taller_nombre": current_taller.nombre,
+            "eta_minutos": asignacion.eta_minutos,
+        },
+    )
+
     db.commit()
     db.refresh(asignacion)
     return asignacion
